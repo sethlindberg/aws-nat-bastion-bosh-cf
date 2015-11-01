@@ -1,0 +1,8 @@
+aws_access_key = "PUT_AWS_ACCESS_KEY_HERE"
+aws_secret_key = "PUT_AWS_SECRET_KEY_HERE"
+# Note that the bosh.pem file is what was downloaded from EC2 API/UI.
+aws_key_path = "../../.ssh/bosh.pem"
+aws_key_name = "bosh"
+aws_region = "us-east-1"
+network = "10.10"
+bosh_type = "ruby" # or "none"; soon "golang"

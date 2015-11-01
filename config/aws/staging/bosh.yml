@@ -1,0 +1,142 @@
+---
+name: bosh
+
+releases:
+- name: bosh
+  url: https://bosh.io/d/github.com/cloudfoundry/bosh?v=219
+  sha1: bbd03790a2839aab26d3fa4cfe1493d361872f33
+- name: bosh-aws-cpi
+  url: https://bosh.io/d/github.com/cloudfoundry-incubator/bosh-aws-cpi-release?v=33
+  sha1: 4f98ca26e696d060bd6ebe0caf0ff1517e25b21d
+
+resource_pools:
+- name: vms
+  network: private
+  stemcell:
+    url: https://bosh.io/d/stemcells/bosh-aws-xen-hvm-centos-7-go_agent?v=3104
+    sha1: e28c1c9ff895ab4fe471efba5aabde7d5f5e8535
+  cloud_properties:
+    instance_type: t2.small
+    ephemeral_disk: {size: 40_000, type: gp2}
+    availability_zone: us-east-1b
+
+disk_pools:
+- name: disks
+  disk_size: 40_000
+  cloud_properties: {type: gp2}
+
+networks:
+- name: private
+  type: manual
+  subnets:
+  - range: 10.0.0.0/24
+    gateway: 10.0.0.1
+    dns: [10.0.0.2]
+    cloud_properties: {subnet: subnet-28436c03}
+- name: public
+  type: vip
+
+jobs:
+- name: bosh
+  instances: 1
+
+  templates:
+  - {name: nats, release: bosh}
+  - {name: redis, release: bosh}
+  - {name: postgres, release: bosh}
+  - {name: blobstore, release: bosh}
+  - {name: director, release: bosh}
+  - {name: health_monitor, release: bosh}
+  - {name: registry, release: bosh}
+  - {name: cpi, release: bosh-aws-cpi}
+
+  resource_pool: vms
+  persistent_disk_pool: disks
+
+  networks:
+  - name: private
+    static_ips: [10.0.0.6]
+    default: [dns, gateway]
+  - name: public
+    static_ips: [52.6.205.61]
+
+  properties:
+    nats:
+      address: 127.0.0.1
+      user: nats
+      password: nat5pa55
+
+    redis:
+      listen_address: 127.0.0.1
+      address: 127.0.0.1
+      password: redi5pa55
+
+    postgres: &db
+      listen_address: 127.0.0.1
+      host: 127.0.0.1
+      user: postgres
+      password: postgre5pa55
+      database: bosh
+      adapter: postgres
+
+    registry:
+      address: 10.0.0.6
+      host: 10.0.0.6
+      db: *db
+      http: {user: admin, password: adminpa55, port: 25777}
+      username: admin
+      password: admin
+      port: 25777
+
+    blobstore:
+      address: 10.0.0.6
+      port: 25250
+      provider: dav
+      director: {user: director, password: directorpa55}
+      agent: {user: agent, password: agentpa55}
+
+    director:
+      address: 127.0.0.1
+      name: my-bosh
+      db: *db
+      cpi_job: cpi
+      max_threads: 10
+      user_management:
+        provider: local
+        local:
+          users:
+          - {name: admin, password: adminpa55}
+          - {name: hm, password: hmpa55}
+
+    hm:
+      director_account: {user: hm, password: hmpa55}
+      resurrector_enabled: true
+
+    aws: &aws
+      access_key_id: AKIAJP55WYBVQGBJFGHA
+      secret_access_key: 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
+      default_key_name: bosh
+      default_security_groups: [bosh-staging,sg-6d0cb80b]
+      region: us-east-1
+
+    agent: {mbus: "nats://nats:nat5pa55@10.0.0.6:4222"}
+
+    ntp: &ntp [0.pool.ntp.org, 1.pool.ntp.org]
+
+cloud_provider:
+  template: {name: cpi, release: bosh-aws-cpi}
+
+  ssh_tunnel:
+    host: 52.6.205.61
+    port: 22
+    user: vcap
+    private_key: /home/centos/.ssh/bosh.pem
+
+  mbus: "https://mbus:mbu5pa55@52.6.205.61:6868"
+
+  properties:
+    aws: *aws
+    agent: {mbus: "https://mbus:mbu5pa55@0.0.0.0:6868"}
+    blobstore: {provider: local, path: /var/vcap/micro_bosh/data/cache}
+    ntp: *ntp
+
