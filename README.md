@@ -13,9 +13,9 @@ It is a separate repository so that important projects using the original reposi
 The goals of this evolution are
 
 1. Modular.
-2. Flexible (select different sizes of CF to install, even customize your own).
 3. Use the new `bosh-init` method for bootstrapping.
 4. Use spruce.
+2. Flexible Sizing (select different sizes of CF to install, even customize your own).
 
 Terraform is still the tool of choice for for initializing the AWS VPC as well as the NAT and Bastion EC2 instances.
 
