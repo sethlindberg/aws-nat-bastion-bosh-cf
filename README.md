@@ -4,6 +4,24 @@ This repository contains all of the scripts necessary for bootstrapping a NAT, B
 
 Note that throught this effort manual steps will appear anywhere that credentials are required.
 
+# Generations
+
+Note that this is the next evolution of the [terraform-aws-cf-install](https://github.com/cloudfoundry-community/terraform-aws-cf-install) project.
+
+It is a separate repository so that important projects using the original repository are not affected by forward progress.
+
+The goals of this evolution are
+
+1. Modular.
+2. Flexible (select different sizes of CF to install, even customize your own).
+3. Use the new `bosh-init` method for bootstrapping.
+4. Use spruce.
+
+Terraform is still the tool of choice for for initializing the AWS VPC as well as the NAT and Bastion EC2 instances.
+
+Note that currently the NAT, Bastion and BOSH Director VMs are intentionally created as small as possible.
+For full production systems it is advised that your Bsation and BOSH Director are larger VMs.
+
 # Preparation
 
 First, this project uses `direnv`, if you do not have `direnv` available please 
