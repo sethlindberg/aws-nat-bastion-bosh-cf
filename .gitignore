@@ -3,3 +3,4 @@ terraform.tfvars
 *.tfplan
 *.tfstate
 *.tfstate.backup
+*.md.html

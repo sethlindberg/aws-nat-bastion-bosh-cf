@@ -1,6 +1,6 @@
-# BOSH AWS VPC Jump Box
+# NAT, Bastion & BOSH Bootstrapping
 
-This repository contains all of the scripts necessary for bootstrapping AWS VPC Jump Box.
+This repository contains all of the scripts necessary for bootstrapping a NAT, Bastion & BOSH on AWS.
 
 Note that throught this effort manual steps will appear anywhere that credentials are required.
 
@@ -15,7 +15,7 @@ Be sure to run `direnv` allow when you change in to this project directory.
 To prepare the environment in order to run the automation, first run the following:
 
 ```sh
-bjb prepare
+make prepare
 ```
 
 Notes
@@ -37,7 +37,7 @@ Next edit the file and replace the values with your AWS account credentials.
 In order to *deploy* a VPC,
 
 ```
-./bin/bjb vpc apply
+make deploy
 ```
 
 ## Destorying
@@ -45,6 +45,6 @@ In order to *deploy* a VPC,
 In order to *destroy* a previously deployed VPC,
 
 ```
-./bin/bjb vpc destroy
+make destroy
 ```
 

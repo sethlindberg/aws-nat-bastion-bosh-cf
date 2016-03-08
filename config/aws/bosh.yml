@@ -3,22 +3,25 @@ name: bosh
 
 releases:
 - name: bosh
-  url: https://bosh.io/d/github.com/cloudfoundry/bosh?v=219
-  sha1: bbd03790a2839aab26d3fa4cfe1493d361872f33
+  url: https://bosh.io/d/github.com/cloudfoundry/bosh?v=${bosh-version}
+  sha1: ${bosh-sha1}
 - name: bosh-aws-cpi
-  url: https://bosh.io/d/github.com/cloudfoundry-incubator/bosh-aws-cpi-release?v=33
-  sha1: 4f98ca26e696d060bd6ebe0caf0ff1517e25b21d
+  url: https://bosh.io/d/github.com/cloudfoundry-incubator/bosh-aws-cpi-release?v=${bosh-aws_cpi_version}
+  sha1: ${bosh-aws_cpi_sha1}
 
 resource_pools:
 - name: vms
   network: private
   stemcell:
-    url: https://bosh.io/d/stemcells/bosh-aws-xen-hvm-centos-7-go_agent?v=3104
-    sha1: e28c1c9ff895ab4fe471efba5aabde7d5f5e8535
+    #url: https://bosh.io/d/stemcells/bosh-aws-xen-hvm-centos-7-go_agent?v=${centos_stemcell_version}
+    #sha1: ${centos_stemcell_sha1}
+    url: https://bosh.io/d/stemcells/bosh-aws-xen-hvm-ubuntu-trusty-go_agent?v=3012
+    sha1: 3380b55948abe4c437dee97f67d2d8df4eec3fc1
+
   cloud_properties:
-    instance_type: t2.small
+    instance_type: ${bosh-director_vm_size}
     ephemeral_disk: {size: 40_000, type: gp2}
-    availability_zone: us-east-1b
+    availability_zone: ${bosh-az}
 
 disk_pools:
 - name: disks
@@ -29,12 +32,10 @@ networks:
 - name: private
   type: manual
   subnets:
-  - range: 10.0.0.0/24
-    gateway: 10.0.0.1
-    dns: [10.0.0.2]
-    cloud_properties: {subnet: subnet-28436c03}
-- name: public
-  type: vip
+  - range: ${network}.1.0/24
+    gateway: ${network}.1.1
+    dns: [${network}.0.2]
+    cloud_properties: {subnet: ${bosh-subnet}}
 
 jobs:
 - name: bosh
@@ -48,17 +49,15 @@ jobs:
   - {name: director, release: bosh}
   - {name: health_monitor, release: bosh}
   - {name: registry, release: bosh}
-  - {name: cpi, release: bosh-aws-cpi}
-
+  - {name: aws_cpi, release: bosh-aws-cpi}
+    
   resource_pool: vms
   persistent_disk_pool: disks
 
   networks:
   - name: private
-    static_ips: [10.0.0.6]
+    static_ips: [${network}.1.6]
     default: [dns, gateway]
-  - name: public
-    static_ips: [52.6.205.61]
 
   properties:
     nats:
@@ -75,13 +74,13 @@ jobs:
       listen_address: 127.0.0.1
       host: 127.0.0.1
       user: postgres
-      password: postgre5pa55
+      password: postgr35pa55
       database: bosh
       adapter: postgres
 
     registry:
-      address: 10.0.0.6
-      host: 10.0.0.6
+      address: ${network}.1.6
+      host: ${network}.1.6
       db: *db
       http: {user: admin, password: adminpa55, port: 25777}
       username: admin
@@ -89,7 +88,7 @@ jobs:
       port: 25777
 
     blobstore:
-      address: 10.0.0.6
+      address: ${network}.1.6
       port: 25250
       provider: dav
       director: {user: director, password: directorpa55}
@@ -97,9 +96,9 @@ jobs:
 
     director:
       address: 127.0.0.1
-      name: my-bosh
+      name: herr-director
       db: *db
-      cpi_job: cpi
+      cpi_job: aws_cpi
       max_threads: 10
       user_management:
         provider: local
@@ -113,26 +112,26 @@ jobs:
       resurrector_enabled: true
 
     aws: &aws
-      access_key_id: AKIAJP55WYBVQGBJFGHA
-      secret_access_key: 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
+      access_key_id: ${aws-access_key}
+      secret_access_key: ${aws-secret_key}
       default_key_name: bosh
-      default_security_groups: [bosh-staging,sg-6d0cb80b]
-      region: us-east-1
+      default_security_groups: [${aws-security-group}]
+      region: ${aws-region}
 
-    agent: {mbus: "nats://nats:nat5pa55@10.0.0.6:4222"}
+    agent: {mbus: "nats://nats:nat5pa55@${network}.1.6:4222"}
 
     ntp: &ntp [0.pool.ntp.org, 1.pool.ntp.org]
 
 cloud_provider:
-  template: {name: cpi, release: bosh-aws-cpi}
+  template: {name: aws_cpi, release: bosh-aws-cpi}
 
   ssh_tunnel:
-    host: 52.6.205.61
+    host: ${network}.1.6
     port: 22
     user: vcap
-    private_key: /home/centos/.ssh/bosh.pem
+    private_key: ~/.ssh/bosh.pem
 
-  mbus: "https://mbus:mbu5pa55@52.6.205.61:6868"
+  mbus: "https://mbus:mbu5pa55@${network}.1.6:6868"
 
   properties:
     aws: *aws

@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+
+set -e # Exit immediately if a simple command exits with exit code >0
+set -u # Report usage of any uninitialized variables.
+
+usage() {
+  cat <<USAGE
+Usage:
+
+  $0 <action> [options]
+
+Actions:
+
+  prepare   - Prepare environment for running automation.
+  provision - Provision jump box.
+
+USAGE
+}
+
+timestamp() { date +'%Y-%m-%dT%H:%M:%S%z'; }
+
+log() { echo "[$(timestamp)]: $*" ; }
+
+err() { log "[err] $*" >&2 ; }
+
+fatal() { log "[fatal] $*" >&2 ; exit 1 ; }
+
+tf_var() {
+  terraform output -state="${STATE_FILE:-${PWD}/terraform.tfstate}" "${1}"
+}
+
+check_install_terraform()  {
+  local _version=0.6.11 _install=false
+
+  log "Checking for terraform CLI ${_version} ..."
+  if ! command -v terraform &>/dev/null
+  then
+    _install=true
+  else
+    if [[ "$(terraform -v | awk '/Terraform v/{print $2}')" != "v${_version}" ]]
+    then 
+      _install=true
+    fi 
+  fi
+
+  if [[ ${_install} == true ]]
+  then 
+    log "Installing terraform CLI ${_version} ..."
+    curl -sOL "https://dl.bintray.com/mitchellh/terraform/terraform_${_version}_darwin_amd64.zip"
+    unzip -d "/usr/local/bin" "terraform_${_version}_darwin_amd64.zip"
+    rm -f "terraform_${_version}_darwin_amd64.zip"
+    log "OK, terraform CLI ${_version} installed."
+  else 
+    log "OK, terraform CLI is ${_version}"
+  fi
+}
+
+provision_vpc() {
+  cd terraform/aws || fatal "Cannot cd terraform/aws!"
+
+  local _action="${1}"
+
+  case ${_action} in 
+    (plan)
+      terraform get -update
+      terraform plan -module-depth=-1 -var-file terraform.tfvars -out terraform.tfplan
+      ;;
+    (apply)
+      terraform apply -var-file terraform.tfvars
+      ;;
+    (destroy)
+      terraform plan -destroy -var-file terraform.tfvars -out terraform.tfplan
+      terraform apply terraform.tfplan
+      ;;
+    (clean)
+      rm -fR .terraform/ terraform.tfplan terraform.tfstate
+      ;;
+    (provision)
+      provision
+    (test)
+      ../../scripts/test
+      ;;
+    (*)
+      fatal "Unknown terraform action '${_action}', expected one of {plan,apply,destroy,clean}"
+      ;;
+  esac
+}
+
+bastion() {
+  local _bastionIP _keyPath
+
+  cd terraform/aws || fatal "Cannot cd to terraform/aws!"
+
+  _bastionIP="$(tf_var bastion_ip)"
+  _keyPath="$(sed -e "s#^~#${HOME}#" < <(tf_var aws_key_path))"
+  
+  local _action="${1}"
+  case "${_action}" in
+    (ip)  echo "${_bastionIP}" ;;
+    (ssh) ssh -i "${_keyPath}" centos@"${_bastionIP}" ;;
+    (*)
+      fatal "Unknown terraform action '${_action}', expected one of {plan,apply,destroy,clean}"
+      ;;
+  esac
+}
+
+replace() {
+  local _fileName="$1" _searchString="$2" _replaceString="$3"
+
+  local _regex="s#${_searchString}#${_replaceString}#"
+
+  if [[ "$(uname -s)" == "Darwin" ]]
+  then #Detect OSX v other linux for sed ''
+    sed -i '' "${_regex}" "${_fileName}" ||
+      fatal "Could not execute execute sed command replace ${_searchString} with ${_replaceString }in file ${_fileName}, terminating install."
+  else
+    sed -i "${_regex}" "${_fileName}" ||
+      fatal "Could not execute execute sed command replace ${_searchString} with ${_replaceString} in file ${_fileName}, terminating install."
+  fi
+}
+
+prepare_bastion_provision_script() {
+  local _src="${PWD}/../../scripts/provision-bastion" \
+    _tmp="/tmp/provision-bastion"
+
+  cp "${_src}" "${_tmp}" || fatal "Error copying ${_src} to ${_tmp}"
+
+  replace "${_tmp}" '^awsKeyID=.*' "awsKeyID=\"$(tf_var aws_access_key)\""
+  replace "${_tmp}" '^awsAccessKey=.*' "awsAccessKey=\"$(tf_var aws_secret_key)\""
+  replace "${_tmp}" '^awsRegion=.*' "awsRegion=\"$(tf_var aws_region)\""
+  replace "${_tmp}" '^awsVPC=.*' "awsVPC=\"$(tf_var aws_vpc_id)\""
+  replace "${_tmp}" '^boshSubnet=.*' "boshSubnet=\"$(tf_var bosh_subnet)\""
+  replace "${_tmp}" '^boshInitVersion=.*' "boshInitVersion=\"$(tf_var bosh_init_version)\""
+  replace "${_tmp}" '^network=.*' "network=\"$(tf_var network)\""
+  replace "${_tmp}" '^cfIP=.*' "cfIP=\"$(tf_var cf_api_ip)\""
+  replace "${_tmp}" '^cfSubnet1=.*' "cfSubnet1=\"$(tf_var cf_subnet1)\""
+  replace "${_tmp}" '^cfSubnet1AZ=.*' "cfSubnet1AZ=\"$(tf_var cf_subnet1_az)\""
+  replace "${_tmp}" '^cfSubnet2=.*' "cfSubnet2=\"$(tf_var cf_subnet2)\""
+  replace "${_tmp}" '^cfSubnet2AZ=.*' "cfSubnet2AZ=\"$(tf_var cf_subnet2_az)\""
+  replace "${_tmp}" '^bastionAZ=.*' "bastionAZ=\"$(tf_var bastion_az)\""
+  replace "${_tmp}" '^bastionID=.*' "bastionID=\"$(tf_var bastion_id)\""
+  replace "${_tmp}" '^lbSubnet1=.*' "lbSubnet1=\"$(tf_var lb_subnet1)\""
+  replace "${_tmp}" '^cfSecurityGroup=.*' "cfSecurityGroup=\"$(tf_var cf_sg)\""
+  replace "${_tmp}" '^cfAdminPass=.*' "cfAdminPass=\"$(tf_var cf_admin_pass)\""
+  replace "${_tmp}" '^cfDomain=.*' "cfDomain=\"$(tf_var cf_domain)\""
+  replace "${_tmp}" '^cfSize=.*' "cfSize=\"$(tf_var cf_size)\""
+  replace "${_tmp}" '^dockerSubnet=.*' "dockerSubnet=\"$(tf_var docker_subnet)\""
+  replace "${_tmp}" '^installDocker=.*' "installDocker=\"$(tf_var install_docker_services)\""
+  replace "${_tmp}" '^cfReleaseVersion=.*' "cfReleaseVersion=\"$(tf_var cf_release_version)\""
+  replace "${_tmp}" '^debug=.*' "debug=\"$(tf_var debug)\""
+  replace "${_tmp}" '^privateDomains=.*' "privateDomains=\"$(tf_var cf_private_domains)\""
+  replace "${_tmp}" '^cfSecurityGroupAllows=.*' "cfSecurityGroupAllows=\"$(tf_var additional_cf_sg_allows)\""
+  replace "${_tmp}" '^cfRunSubdomain=.*' "cfRunSubdomain=\"$(tf_var cf_run_subdomain)\""
+  replace "${_tmp}" '^cfAppsSubdomain=.*' "cfAppsSubdomain=\"$(tf_var cf_apps_subdomain)\""
+  replace "${_tmp}" '^cfPass=.*' "cfPass=\"$(tf_var cf_pass)\""
+
+  for _job in backbone api services health runner
+  do
+    for _zone in Z1 Z2 
+    do
+      local _jobName _lcJobName _key _value
+      _jobName="${_job}_${_zone}_count"
+      _lcJobName="$(tr '[:upper:]' '[:lower:]' <<< "${_jobName}")"
+      _key="${_job}Count${_zone}"
+      _value="$(tf_var "${_lcJobName}")"
+
+      replace "${_tmp}" "${_key}=.*" "${_key}=\"${_value}\""
+    done
+  done
+
+  for _job in data public_HAProxy private_HAProxy backbone api services health runner
+  do
+    local _lcJobName _value _key
+    _lcJobName=$(tr '[:upper:]' '[:lower:]' <<<"${_job}")
+    _value=$(tf_var "${_lcJobName}_resource_pool")
+    _key="${_job//_/}Pool"
+
+    replace "${_tmp}" "${_key}=.*" "${_key}=\"${_value}\""
+  done
+}
+
+prepare_bosh_yaml_manifest() {
+  local _src _tmp
+
+  _src="${PWD}/../../config/aws/bosh.yml"
+  _tmp="/tmp/bosh.yml"
+
+  cp "${_src}" "${_tmp}" || fatal "Error copying ${_src} to ${_tmp}"
+
+  replace "${_tmp}" "\${bosh-version}" "$(tf_var "bosh_version")"
+  replace "${_tmp}" "\${bosh-sha1}" "$(tf_var "bosh_sha1")"
+  replace "${_tmp}" "\${bosh-aws_cpi_version}" "$(tf_var "bosh_aws_cpi_version")"
+  replace "${_tmp}" "\${bosh-aws_cpi_sha1}" "$(tf_var "bosh_aws_cpi_sha1")"
+  replace "${_tmp}" "\${bosh-director_vm_size}" "$(tf_var "bosh_director_vm_size")"
+  replace "${_tmp}" "\${bosh-subnet}" "$(tf_var "bosh_subnet")"
+  replace "${_tmp}" "\${bosh-az}" "$(tf_var "aws_subnet_bastion_az")"
+  replace "${_tmp}" "\${network}" "$(tf_var "network")"
+  replace "${_tmp}" "\${centos_stemcell_version}" "$(tf_var "centos_stemcell_version")"
+  replace "${_tmp}" "\${centos_stemcell_sha1}" "$(tf_var "centos_stemcell_sha1")"
+  replace "${_tmp}" "\${aws-access_key}" "$(tf_var "aws_access_key")"
+  replace "${_tmp}" "\${aws-secret_key}" "$(tf_var "aws_secret_key")"
+  replace "${_tmp}" "\${aws-region}" "$(tf_var "aws_region")"
+  replace "${_tmp}" "\${aws-public-ip}" "$(tf_var "cf_api_ip")"
+  replace "${_tmp}" "\${aws-security-group}" "$(tf_var "cf_sg_id")"
+}
+
+prepare_cf_tiny_yaml_manifest() {
+  local _src _tmp _size
+
+  _size="$(tf_var "cf_size")"
+  _src="${PWD}/../../config/aws/cf-${_size}.yml"
+  _tmp="/tmp/cf-${_size}.yml"
+
+  cp "${_src}" "${_tmp}" || fatal "Error copying ${_src} to ${_tmp}"
+
+  replace "${_tmp}" "\${cf-release-version}" "$(tf_var "cf_release_version")"
+  replace "${_tmp}" "\${cf-etcd-version}" "$(tf_var "cf_etcd_version")"
+  replace "${_tmp}" "\${cf-haproxy-version}" "$(tf_var "cf_haproxy_version")"
+  replace "${_tmp}" "\${cf-domain}" "$(tf_var "cf_domain")"
+  replace "${_tmp}" "\${cf-admin-pass}" "$(tf_var "cf_admin_pass")"
+  replace "${_tmp}" "\${cf-subnet1}" "$(tf_var "bosh_subnet")"
+  replace "${_tmp}" "\${cf-subnet2}" "$(tf_var "bosh_subnet")"
+  replace "${_tmp}" "\${lb-subnet1}" "$(tf_var "bosh_subnet")"
+  replace "${_tmp}" "\${cf-subnet1-az}" "$(tf_var "aws_subnet_bastion_az")"
+  replace "${_tmp}" "\${cf-private-domains}" "$(tf_var "cf_private_domains")"
+  replace "${_tmp}" "\${cf-ip}" "$(tf_var "cf_api_ip")"
+  replace "${_tmp}" "\${cf-sg}" "$(tf_var "cf_sg")"
+  replace "${_tmp}" "\${cf-network}" "$(tf_var "network")"
+  replace "${_tmp}" "\${cf-pass}" "$(tf_var "cf_pass")"
+  replace "${_tmp}" "\${cf-size}" "$(tf_var "cf_size")"
+}
+
+scp_file() {
+  local _src _dest _index _maxAttempts  _sleepSeconds _bastionIP _keyPath
+
+  _bastionIP="$(tf_var bastion_ip)"
+  _keyPath="$(sed -e "s#^~#${HOME}#" < <(tf_var aws_key_path))"
+
+  _src="${1}" 
+  _dest="${2}"
+  _index=1
+  _maxAttempts=10
+  _sleepSeconds=10
+
+  while (( _index <= _maxAttempts ))
+  do
+    echo "Attempting to scp to centos@${_bastionIP}... (${_index}/${_maxAttempts})"
+    ssh -o StrictHostKeyChecking=no -i "${_keyPath}" "centos@${_bastionIP}" \
+      "[[ -d deployments ]] || mkdir -p deployments"
+    scp -o StrictHostKeyChecking=no -i "${_keyPath}" "${_src}" "centos@${_bastionIP}:${_dest}"
+    case $? in
+      (0) echo "${_index}> Success"; break ;;
+      (*) echo "${_index} of ${_maxAttempts}> Bastion SSH server not ready yet, waiting ${_sleepSeconds} seconds..." ;;
+    esac
+    sleep "${_sleepSeconds}"
+    ((index += 1))
+  done
+}
+
+provision() {
+  local _bastionIP _keyPath _action _cmd _size
+
+  cd terraform/aws || fatal "Cannot cd to terraform/aws!"
+
+  _action="${1:-}"
+  _bastionIP="$(tf_var bastion_ip)"
+  _size="$(tf_var cf_size)"
+  _keyPath="$(sed -e "s#^~#${HOME}#" < <(tf_var aws_key_path))"
+  
+  prepare_bastion_provision_script # Wait until SSH on Bastion server is working
+  scp_file "/tmp/provision-bastion" "provision"
+
+	_cmd="chmod +x \${HOME}/provision"
+  ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
+
+  prepare_bosh_yaml_manifest
+  scp_file "/tmp/bosh.yml" "deployments/bosh.yml"
+
+  prepare_cf_tiny_yaml_manifest
+  scp_file "/tmp/cf-${_size}.yml" "deployments/cf-${_size}.yml"
+
+	_cmd="DEBUG=true \${HOME}/provision ${_action}"
+  ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
+}
+
+main() {
+  [[ -z "${DEBUG:-}" ]] || set -x
+
+  action="$1"
+  shift || true
+  case "${action}" in
+    (vpc)
+      provision_vpc "$@"
+      ;;
+    (prepare)
+      check_install_terraform
+      ;;
+    (provision)
+      provision "$@"
+      ;;
+    (bastion)
+      bastion "$@"
+      ;;
+    (*|help|-h)
+      usage
+      ;;
+  esac
+}
+
+main "${@}"
+
+exit $?

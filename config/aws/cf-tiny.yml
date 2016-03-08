@@ -1,0 +1,109 @@
+---
+name: cf-aws-tiny
+director_uuid: ${bosh-director-uuid}
+
+releases:
+  - name: cf
+    version: ${cf-release-version}
+    git: https://github.com/cloudfoundry/cf-release.git
+  - name: etcd
+    version: ${cf-etcd-version}
+    git: https://github.com/cloudfoundry-incubator/etcd-release.git
+  - name: cf-haproxy
+    version: ${cf-haproxy-version}
+    git: https://github.com/cloudfoundry-community/cf-haproxy-boshrelease.git
+
+templates:
+  - cf/cf-deployment.yml
+  - cf/cf-resource-pools.yml
+  - tiny/cf-tiny-scalable.yml
+  - cf-uaa-port.yml
+  - cf-allow-services-access.yml
+  - cf/cf-properties.yml
+  - cf/cf-infrastructure-aws.yml
+  - cf-properties.yml
+  - tiny/cf-jobs-nfs.yml
+  - tiny/cf-jobs-uaa.yml
+  - tiny/cf-jobs-base.yml
+  - parallel.yml
+  - cf-no-ssl.yml
+  - cf-secrets.yml
+  - tiny/cf-use-nfs.yml
+  - tiny/cf-use-haproxy.yml
+  - cf-networking.yml
+
+meta:
+  domain: run.${cf-domain}
+  app_domains: apps.${cf-domain}
+  secret: c1oudc0w # Used for all passwords except cf admin
+  admin_secret: ${cf-admin-pass}
+  default_stemcell:
+    name: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
+    version: latest
+
+  zones:
+    z1: ${cf-subnet1-az}
+    # z2: ${cf-subnet2-az}
+
+  # Only needed if you have domains hosted by CF that you want to be accessed 
+  # only from inside a secure area 
+  # (Eg. cf apps can hit those domains, but outside can not access)
+  ha_proxy:
+    internal_only_domains: [] # ${cf-private-domains}
+
+  additional_security_group_rules: [] # if you have any additional security group rules, add here
+
+  floating_static_ips:
+    - ${cf-eip}
+  networks:
+    security_groups:
+    - ${cf-sg}
+    ipmask: "${cf-network}"
+    dns:
+    - ${cf-network}.0.2
+    cf1:
+      quad: "3"
+      net_id: ${cf-subnet1}
+    cf2:
+      quad: "4"
+      net_id: ${cf-subnet2}
+    lb1:
+      quad: "2"
+      net_id: ${lb-subnet1}
+  environment: cf-aws-tiny
+  instances:
+    # Load balancers
+    private_haproxy_z1: 1
+    public_haproxy_z1:  1
+
+    # Primary AZ nodes
+    backbone_z1:  1
+    api_z1:       1
+    services_z1:  1
+    health_z1:    1
+    runner_z1:    1
+
+    # Secondary AZ nodes (for HA operations)
+    backbone_z2:  0
+    api_z2:       0
+    services_z2:  0
+    health_z2:    0
+    runner_z2:    0
+
+  job_pools:
+    backbone:        large
+    data:            large
+    public_haproxy:  small
+    private_haproxy: small
+    api:             medium
+    services:        medium
+    health:          medium
+    runner:          runner
+
+compilation:
+  workers: 2
+  reuse_compilation_vms: true
+  cloud_properties:
+    instance_type: c3.large
+    availability_zone: ${cf-subnet1-az}
+

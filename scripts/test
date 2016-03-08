@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+# TODO: This script was copied from upstream, clean it up later.
+
+exitcode=0
+TFILE=$(mktemp -t terraform-aws-cf-install.XXX)
+green="\e[1;34m"
+red="\e[0;31m"
+reset="\e[0m"
+
+# $1 = exit code (will exit testing if non-zero)
+# $2 = description of the test
+# $3 = output of the test
+cleanup() {
+  rm -f $TFILE
+  if [[ $1 -ne 0 ]]; then
+    echo -e "$red test '$2' failed: $reset\n $3"
+    exit $1
+  fi
+}
+
+# Pre-testing cleanup
+rm -fR .terraform/modules/
+
+desc="Can we find the terraform binary?"
+output=$(which terraform)
+cleanup "$?" "$desc" "Couldn't find terraform. Is it in your PATH?"
+
+desc="Can we fetch the dependencies?"
+output=$(terraform get -update)
+cleanup "$?" "$desc" "Unable to fetch the modules we depend on"
+
+desc="Does the plan compile?"
+output=$(terraform plan -var-file terraform.tfvars.example)
+cleanup "$?" "$desc" "$output"
+
+# FIXME: Find a better way to double check plan modifications, terraform output
+#        is no longer consistent from run to run, so diffs wont work
+#desc="Did the baseline terraform plan change?"
+#terraform plan -var-file terraform.tfvars.example &> $TFILE
+#output=$(diff test-fixtures/terraform.testplan $TFILE)
+#cleanup "$?" "$desc" "$output"
+
+# If we got here, all the tests passed
+echo -e "$green All tests passed $reset"
+
+exit 0

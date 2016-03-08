@@ -1,0 +1,529 @@
+---
+name: cf
+director_uuid: ${bosh-director-uuid}
+
+releases:
+- {name: cf, version: latest}
+
+networks:
+- name: cf_private
+  type: manual
+  subnets:
+  - range: ${network}.16.0/24
+    gateway: ${network}.16.1
+    dns: [${network}.0.2]
+    reserved: ["${network}.16.2 - ${network}.16.3"]
+    static: ["${network}.16.100 - ${network}.16.105"]
+    cloud_properties:
+      subnet: ${cf-subnet1}
+
+- name: cf_public
+  type: manual
+  subnets:
+  - range: ${network}.0.0/24
+    gateway: ${network}.0.1
+    dns: [${network}.0.2]
+    reserved: ["${network}.0.2 - ${network}.0.10"]
+    cloud_properties:
+      subnet: ${bosh-subnet}
+      security_groups:
+        - ${cf-sg}
+        - ${bosh-sg}
+
+- name: elastic
+  type: vip
+  cloud_properties: {}
+
+resource_pools:
+- name: small_z1
+  network: cf_private
+  stemcell:
+    name: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
+    version: ${bosh-stemcell-version}
+  cloud_properties:
+    availability_zone: ${cf-subnet1-az}
+    instance_type: c3.large
+
+compilation:
+  workers: 6
+  network: cf_private
+  reuse_compilation_vms: true
+  cloud_properties:
+    availability_zone: ${cf-subnet1-az}
+    instance_type: c3.large
+
+update:
+  canaries: 1
+  max_in_flight: 1
+  serial: false
+  canary_watch_time: 30000-600000
+  update_watch_time: 5000-600000
+
+jobs:
+- name: nats_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: nats, release: cf}
+  - {name: nats_stream_forwarder, release: cf}
+  - {name: metron_agent, release: cf}
+  networks:
+  - name: cf_private
+    static_ips: [${network}.16.103]
+
+- name: etcd_z1
+  instances: 1
+  resource_pool: small_z1
+  persistent_disk: 102400
+  templates:
+  - {name: etcd, release: cf}
+  - {name: etcd_metrics_server, release: cf}
+  - {name: metron_agent, release: cf}
+  networks:
+  - name: cf_private
+    static_ips: [${network}.16.104]
+  properties:
+    etcd_metrics_server:
+      nats:
+        machines: [${network}.16.103]
+        password: ${cf-nats-pass}
+        username: nats
+
+- name: consul_z1
+  instances: 1
+  persistent_disk: 1024
+  resource_pool: small_z1
+  templates:
+  - {name: metron_agent, release: cf}
+  - {name: consul_agent, release: cf}
+  networks:
+  - name: cf_private
+    static_ips: [${network}.16.105]
+  properties:
+    consul:
+      agent:
+        mode: server
+
+- name: blobstore_z1
+  instances: 1
+  persistent_disk: 102400
+  resource_pool: small_z1
+  templates:
+  - {name: blobstore, release: cf}
+  - {name: metron_agent, release: cf}
+  - {name: route_registrar, release: cf}
+  - {name: consul_agent, release: cf}
+  networks:
+  - name: cf_private
+  properties:
+    consul:
+      agent:
+        services:
+          blobstore: {}
+    route_registrar:
+      routes:
+      - name: blobstore
+        port: 80
+        registration_interval: 20s
+        tags:
+          component: blobstore
+        uris:
+        - "blobstore.${cf-domain}"
+
+- name: postgres_z1
+  instances: 1
+  persistent_disk: 1024
+  resource_pool: small_z1
+  templates:
+  - {name: postgres, release: cf}
+  - {name: metron_agent, release: cf}
+  networks:
+  - name: cf_private
+    static_ips: [${network}.16.101]
+  update:
+    serial: true
+
+- name: api_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: cloud_controller_ng, release: cf}
+  - {name: cloud_controller_worker, release: cf}
+  - {name: cloud_controller_clock, release: cf}
+  - {name: metron_agent, release: cf}
+  - {name: route_registrar, release: cf}
+  - {name: consul_agent, release: cf}
+  networks:
+  - name: cf_private
+  properties:
+    consul:
+      agent:
+        services:
+          cloud_controller_ng: {}
+    route_registrar:
+      routes:
+      - name: api
+        registration_interval: 20s
+        port: 9022
+        uris:
+        - "api.${cf-domain}"
+
+- name: ha_proxy_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: haproxy, release: cf}
+  - {name: metron_agent, release: cf}
+  networks:
+  - name: elastic
+    static_ips: [${cf-eip}]
+  - name: cf_public
+    default: [gateway, dns]
+  properties:
+    ha_proxy:
+      ssl_pem: |
+        ${cf-haproxy-ssl-pem}
+    router:
+      servers:
+        z1: [${network}.16.102]
+
+- name: hm9000_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: hm9000, release: cf}
+  - {name: metron_agent, release: cf}
+  - {name: route_registrar, release: cf}
+  networks:
+  - name: cf_private
+  properties:
+    route_registrar:
+      routes:
+      - name: hm9000
+        registration_interval: 20s
+        port: 5155
+        uris:
+        - "hm9000.${cf-domain}"
+
+- name: doppler_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: doppler, release: cf}
+  networks:
+  - name: cf_private
+  properties:
+    doppler: {zone: z1}
+    doppler_endpoint:
+      shared_secret: ${cf-pass}
+
+- name: loggregator_trafficcontroller_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: loggregator_trafficcontroller, release: cf}
+  - {name: metron_agent, release: cf}
+  - {name: route_registrar, release: cf}
+  networks:
+  - name: cf_private
+  properties:
+    traffic_controller: {zone: z1}
+    route_registrar:
+      routes:
+      - name: doppler
+        registration_interval: 20s
+        port: 8081
+        uris:
+        - "doppler.${cf-domain}"
+      - name: loggregator
+        registration_interval: 20s
+        port: 8080
+        uris:
+          - "loggregator.${cf-domain}"
+
+- name: uaa_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: uaa, release: cf}
+  - {name: metron_agent, release: cf}
+  - {name: route_registrar, release: cf}
+  networks:
+  - name: cf_private
+  properties:
+    login:
+      catalina_opts: -Xmx768m -XX:MaxPermSize=256m
+    route_registrar:
+      routes:
+      - name: uaa
+        registration_interval: 20s
+        port: 8080
+        uris:
+        - "uaa.${cf-domain}"
+        - "*.uaa.${cf-domain}"
+        - "login.${cf-domain}"
+        - "*.login.${cf-domain}"
+    uaa:
+      admin:
+        client_secret: ${cf-pass}
+      batch:
+        password: ${cf-pass}
+        username: batch_user
+      cc:
+        client_secret: ${cf-pass}
+      scim:
+        userids_enabled: true
+        users:
+        - admin|${cf-pass}|scim.write,scim.read,openid,cloud_controller.admin,doppler.firehose,routing.router_groups.read
+    uaadb:
+      address: ${network}.16.101
+      databases:
+      - {name: uaadb, tag: uaa}
+      db_scheme: postgresql
+      port: 5524
+      roles:
+      - {name: uaaadmin, password: ${cf-pass}, tag: admin}
+
+- name: router_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: gorouter, release: cf}
+  - {name: metron_agent, release: cf}
+  - {name: consul_agent, release: cf}
+  networks:
+  - name: cf_private
+    static_ips: [${network}.16.102]
+  properties:
+    dropsonde: {enabled: true}
+
+- name: runner_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: dea_next, release: cf}
+  - {name: dea_logging_agent, release: cf}
+  - {name: metron_agent, release: cf}
+  - {name: consul_agent, release: cf}
+  networks:
+  - name: cf_private
+  properties:
+    dea_next: {zone: z1}
+
+properties:
+  networks: {apps: cf_private}
+  app_domains: [${cf-domain}]
+  cc:
+    allow_app_ssh_access: false
+    buildpacks:
+      blobstore_type: webdav
+      webdav_config:
+        password: ${cf-pass}
+        private_endpoint: http://blobstore.service.cf.internal
+        public_endpoint: http://blobstore.${cf-domain}
+        secret: ${cf-pass}
+        username: blobstore-username
+    droplets:
+      blobstore_type: webdav
+      webdav_config:
+        password: ${cf-pass}
+        private_endpoint: http://blobstore.service.cf.internal
+        public_endpoint: http://blobstore.${cf-domain}
+        secret: ${cf-pass}
+        username: blobstore-username
+    packages:
+      blobstore_type: webdav
+      webdav_config:
+        password: ${cf-pass}
+        private_endpoint: http://blobstore.service.cf.internal
+        public_endpoint: http://blobstore.${cf-domain}
+        secret: ${cf-pass}
+        username: blobstore-username
+    resource_pool:
+      blobstore_type: webdav
+      webdav_config:
+        password: ${cf-pass}
+        private_endpoint: http://blobstore.service.cf.internal
+        public_endpoint: http://blobstore.${cf-domain}
+        secret: ${cf-pass}
+        username: blobstore-username
+    bulk_api_password: ${cf-pass}
+    db_encryption_key: ${cf-pass}
+    default_running_security_groups: [public_networks, dns]
+    default_staging_security_groups: [public_networks, dns]
+    install_buildpacks:
+    - {name: java_buildpack, package: buildpack_java}
+    - {name: ruby_buildpack, package: ruby-buildpack}
+    - {name: nodejs_buildpack, package: nodejs-buildpack}
+    - {name: go_buildpack, package: go-buildpack}
+    - {name: python_buildpack, package: python-buildpack}
+    - {name: php_buildpack, package: php-buildpack}
+    - {name: staticfile_buildpack, package: staticfile-buildpack}
+    - {name: binary_buildpack, package: binary-buildpack}
+    internal_api_password: ${cf-pass}
+    quota_definitions:
+      default:
+        memory_limit: 102400
+        non_basic_services_allowed: true
+        total_routes: 1000
+        total_services: -1
+    security_group_definitions:
+    - name: public_networks
+      rules:
+      - {destination: 0.0.0.0-9.255.255.255, protocol: all}
+      - {destination: 11.0.0.0-169.253.255.255, protocol: all}
+      - {destination: 169.255.0.0-172.15.255.255, protocol: all}
+      - {destination: 172.32.0.0-192.167.255.255, protocol: all}
+      - {destination: 192.169.0.0-255.255.255.255, protocol: all}
+    - name: dns
+      rules:
+      - {destination: 0.0.0.0/0, ports: '53', protocol: tcp}
+      - {destination: 0.0.0.0/0, ports: '53', protocol: udp}
+    srv_api_uri: https://api.${cf-domain}
+    staging_upload_password: ${cf-pass}
+    staging_upload_user: staging_upload_user
+  ccdb:
+    address: ${network}.16.101
+    databases:
+    - {name: ccdb, tag: cc}
+    db_scheme: postgres
+    port: 5524
+    roles:
+    - {name: ccadmin, password: ${cf-pass}, tag: admin}
+  consul:
+    agent:
+      log_level: null
+      servers:
+        lan:
+        - ${network}.16.105
+    encrypt_keys:
+    - ${cf-pass}
+    require_ssl: false
+  blobstore:
+    admin_users:
+    - password: ${cf-pass}
+      username: blobstore-username
+    secure_link:
+      secret: ${cf-pass}
+  databases:
+    databases:
+    - {name: ccdb, tag: cc, citext: true}
+    - {name: uaadb, tag: uaa, citext: true}
+    port: 5524
+    roles:
+    - {name: ccadmin, password: ${cf-pass}, tag: admin}
+    - {name: uaaadmin, password: ${cf-pass}, tag: admin}
+  dea_next:
+    advertise_interval_in_seconds: 5
+    heartbeat_interval_in_seconds: 10
+    memory_mb: 33996
+  description: Cloud Foundry sponsored by Pivotal
+  domain: ${cf-domain}
+  etcd:
+    machines: [${network}.16.104]
+    peer_require_ssl: false
+    require_ssl: false
+  hm9000:
+    url: https://hm9000.${cf-domain}
+    port: 5155
+  logger_endpoint:
+    port: 4443
+  loggregator:
+    etcd:
+      machines: [${network}.16.104]
+  loggregator_endpoint:
+    shared_secret: ${cf-pass}
+  metron_agent:
+    zone: z1
+    deployment: minimal-aws
+  metron_endpoint:
+    shared_secret: ${cf-pass}
+  nats:
+    machines: [${network}.16.103]
+    password: ${cf-pass}
+    port: 4222
+    user: nats
+  ssl:
+    skip_cert_verify: true
+  system_domain: ${cf-domain}
+  system_domain_organization: default_organization
+  uaa:
+    clients:
+      cf:
+        access-token-validity: 600
+        authorities: uaa.none
+        authorized-grant-types: implicit,password,refresh_token
+        autoapprove: true
+        override: true
+        refresh-token-validity: 2592000
+        scope: cloud_controller.read,cloud_controller.write,openid,password.write,cloud_controller.admin,scim.read,scim.write,doppler.firehose,uaa.user,routing.router_groups.read
+      cc-service-dashboards:
+        authorities: clients.read,clients.write,clients.admin
+        authorized-grant-types: client_credentials
+        scope: openid,cloud_controller_service_permissions.read
+        secret: ${cf-pass}
+      cloud_controller_username_lookup:
+        authorities: scim.userids
+        authorized-grant-types: client_credentials
+        secret: ${cf-pass}
+      cc_routing:
+        authorities: routing.router_groups.read
+        secret: ${cf-pass}
+        authorized-grant-types: client_credentials
+      gorouter:
+        authorities: routing.routes.read
+        authorized-grant-types: client_credentials,refresh_token
+        secret: ${cf-pass}
+      tcp_emitter:
+        authorities: routing.routes.write,routing.routes.read
+        authorized-grant-types: client_credentials,refresh_token
+        secret: ${cf-pass}
+      tcp_router:
+        authorities: routing.routes.read
+        authorized-grant-types: client_credentials,refresh_token
+        secret: ${cf-pass}
+      doppler:
+        authorities: uaa.resource
+        secret: ${cf-pass}
+      login:
+        authorities: oauth.login,scim.write,clients.read,notifications.write,critical_notifications.write,emails.write,scim.userids,password.write
+        authorized-grant-types: authorization_code,client_credentials,refresh_token
+        redirect-uri: https://login.${cf-domain}
+        scope: openid,oauth.approvals
+        secret: ${cf-pass}
+      servicesmgmt:
+        authorities: uaa.resource,oauth.service,clients.read,clients.write,clients.secret
+        authorized-grant-types: authorization_code,client_credentials,password,implicit
+        autoapprove: true
+        redirect-uri: https://servicesmgmt.${cf-domain}/auth/cloudfoundry/callback
+        scope: openid,cloud_controller.read,cloud_controller.write
+        secret: ${cf-pass}
+    jwt:
+      signing_key: |
+        -----BEGIN RSA PRIVATE KEY-----
+        MIICXAIBAAKBgQDHFr+KICms+tuT1OXJwhCUmR2dKVy7psa8xzElSyzqx7oJyfJ1
+        JZyOzToj9T5SfTIq396agbHJWVfYphNahvZ/7uMXqHxf+ZH9BL1gk9Y6kCnbM5R6
+        0gfwjyW1/dQPjOzn9N394zd2FJoFHwdq9Qs0wBugspULZVNRxq7veq/fzwIDAQAB
+        AoGBAJ8dRTQFhIllbHx4GLbpTQsWXJ6w4hZvskJKCLM/o8R4n+0W45pQ1xEiYKdA
+        Z/DRcnjltylRImBD8XuLL8iYOQSZXNMb1h3g5/UGbUXLmCgQLOUUlnYt34QOQm+0
+        KvUqfMSFBbKMsYBAoQmNdTHBaz3dZa8ON9hh/f5TT8u0OWNRAkEA5opzsIXv+52J
+        duc1VGyX3SwlxiE2dStW8wZqGiuLH142n6MKnkLU4ctNLiclw6BZePXFZYIK+AkE
+        xQ+k16je5QJBAN0TIKMPWIbbHVr5rkdUqOyezlFFWYOwnMmw/BKa1d3zp54VP/P8
+        +5aQ2d4sMoKEOfdWH7UqMe3FszfYFvSu5KMCQFMYeFaaEEP7Jn8rGzfQ5HQd44ek
+        lQJqmq6CE2BXbY/i34FuvPcKU70HEEygY6Y9d8J3o6zQ0K9SYNu+pcXt4lkCQA3h
+        jJQQe5uEGJTExqed7jllQ0khFJzLMx0K6tj0NeeIzAaGCQz13oo2sCdeGRHO4aDh
+        HH6Qlq/6UOV5wP8+GAcCQFgRCcB+hrje8hfEEefHcFpyKH+5g1Eu1k0mLrxK2zd+
+        4SlotYRHgPCEubokb2S1zfZDWIXW3HmggnGgM949TlY=
+        -----END RSA PRIVATE KEY-----
+
+      verification_key: |
+        -----BEGIN PUBLIC KEY-----
+        MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDHFr+KICms+tuT1OXJwhCUmR2d
+        KVy7psa8xzElSyzqx7oJyfJ1JZyOzToj9T5SfTIq396agbHJWVfYphNahvZ/7uMX
+        qHxf+ZH9BL1gk9Y6kCnbM5R60gfwjyW1/dQPjOzn9N394zd2FJoFHwdq9Qs0wBug
+        spULZVNRxq7veq/fzwIDAQAB
+        -----END PUBLIC KEY-----
+
+    ssl:
+      port: -1
+    url: https://uaa.${cf-domain}

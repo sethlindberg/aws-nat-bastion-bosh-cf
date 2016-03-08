@@ -1,0 +1,434 @@
+#!/usr/bin/env bash
+
+set -e # Exit immediately if a simple command exits with exit code >0
+
+error() { echo -e "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*" >&2 ; }
+
+fatal() { error "$*" ; exit 1 ; }
+
+provision_path() {
+  echo "[provision] Configuring PATH..."
+  {
+    if ! [[ -d "${HOME}/bin" ]] 
+    then 
+      mkdir "${HOME}/bin"
+      echo 'PATH="$PATH:$HOME/bin"' >> "${HOME}/.bashrc"
+    fi
+    source "${HOME}/.bashrc"
+  } &>>"${HOME}/provision.log"
+}
+
+provision_ssh_keys() {
+  echo "[provision] Configuring SSH Keys..."
+  {
+    if [[ ! -s $HOME/.ssh/id_rsa ]]
+    then
+      ssh-keygen -t rsa -b 4096 -N '' -C 'bosh-vpc-bastion' -f "${HOME}/.ssh/id_rsa"
+    fi
+    if [[ ! -s ${HOME}/.ssh/authorized_keys ]]
+    then
+      touch "${HOME}/.ssh/authorized_keys"
+      chmod 0640 "${HOME}/.ssh/authorized_keys"
+      for file in "${HOME}/sshkeys"/* 
+      do cat "${file}" >> "${HOME}/.ssh/known_hosts"
+      done
+      chmod 0600 "${HOME}/.ssh/bosh.pem"
+    fi
+  } &>>"${HOME}/provision.log"
+}
+
+provision_os_packages() {
+  echo "[provision] Installing Packages..."
+  {
+    release=$(cat /etc/*release | tr -d '\n')
+    case "${release}" in
+      (*Ubuntu*|*Debian*)
+        sudo apt-get update -yq
+        sudo apt-get install -yq aptitude
+        sudo aptitude -yq install build-essential vim-nox git unzip tree \
+          libxslt-dev libxslt1.1 libxslt1-dev libxml2 libxml2-dev \
+          libpq-dev libmysqlclient-dev libsqlite3-dev \
+          g++ gcc make libc6-dev libreadline6-dev zlib1g-dev libssl-dev libyaml-dev \
+          libsqlite3-dev sqlite3 autoconf libgdbm-dev libncurses5-dev automake \
+          libtool bison pkg-config libffi-dev cmake gpg patch screen
+        ;;
+      (*CentOS*|*RedHat*|*Amazon*)
+        sudo yum update -y
+        sudo yum install -y epel-release
+        sudo yum install -y git bzip2 unzip xz tree rsync openssl openssl-devel \
+          zlib zlib-devel libevent libevent-devel readline readline-devel cmake ntp \
+          htop wget tmux screen gcc g++ autoconf pcre pcre-devel vim-enhanced gcc mysql-devel \
+          postgresql-devel postgresql-libs sqlite-devel libxslt-devel libxml2-devel \
+          yajl-ruby cmake gpg patch gcc-c++
+        ;;
+    esac
+  } &>>"${HOME}/provision.log"
+}
+
+provision_rvm() {
+  echo "[provision] Installing RVM..."
+  {
+    if [[ ! -d "$HOME/.rvm" ]] 
+    then 
+      gpg --keyserver hkp://keys.gnupg.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3
+      # curl -sO https://raw.githubusercontent.com/rvm/rvm/master/binscripts/rvm-installer
+      # curl -sO https://raw.githubusercontent.com/rvm/rvm/master/binscripts/rvm-installer.asc
+      # gpg --verify rvm-installer.asc && bash rvm-installer stable
+      # rm -f rvm-installer*
+      curl -sSL https://get.rvm.io | bash -s stable
+    fi
+  } &>>"${HOME}/provision.log"
+
+  source "${HOME}/.rvm/scripts/rvm" &>/dev/null # Load into current shell environment
+}
+
+provision_ruby() {
+  echo "[provision] Installing Ruby..."
+  {
+    rvm autolibs read-only
+    rvm install ruby-2.1 # https://rvm.io/rvm/autolibs
+    rvm use ruby-2.1 --default
+    # rvm alias create default 2.1
+  } &>>"${HOME}/provision.log"
+  source "${HOME}/.rvm/environments/default" # Load into current shell env
+}
+
+provision_bosh_cli() {
+  echo "[provision] Installing BOSH CLI..."
+  {
+    echo -e "install: --no-rdoc --no-ri\nupdate: --no-rdoc --no-ri\n" \
+      > "$HOME/.gemrc"
+    gem install fog-aws -v 0.1.1 --quiet
+    gem install bundler bosh_cli --quiet
+    bosh -v
+    cat > "${HOME}/.fog" <<EOF 
+    :default:
+    :aws_access_key_id: ${awsKeyID}
+    :aws_secret_access_key: ${awsAccessKey}
+    :region: ${awsRegion}
+EOF
+  } &>>"${HOME}/provision.log"
+}
+
+provision_bosh_workspace_disk() {
+  echo "[provision] BOSH Workspace..."
+  {
+    if [[ ! -d "$HOME/workspace" ]]
+    then
+      sudo /sbin/mkfs.ext4 /dev/xvdc
+      sudo /sbin/e2label /dev/xvdc workspace
+      sudo tee -a /etc/fstab \
+        <<< "LABEL=workspace ${HOME}/workspace ext4 defaults,discard 0 0"
+      mkdir -p "${HOME}/workspace"
+      sudo mount -a
+    else
+      sudo chown -R "${USER}" "${HOME}/workspace"
+    fi
+
+    if [[ ! -d "${HOME}/workspace/tmp" ]]
+    then
+      sudo rsync -avq /tmp/ "${HOME}/workspace/tmp/"
+    fi
+
+    if ! [[ -L "/tmp" && -d "/tmp" ]]
+    then
+      sudo rm -fR /tmp
+      sudo ln -s "${HOME}/workspace/tmp" /tmp
+    fi
+    mkdir -p "${HOME}/workspace/deployments"
+    sudo chown -R "${USER}" "${HOME}/workspace"
+    sudo chmod a=rwx,o+t "${HOME}/workspace/tmp"
+  } &>>"${HOME}/provision.log"
+}
+
+provision_bosh_init() {
+  echo "[provision] Installing bosh-init..."
+  {
+    # https://github.com/cloudfoundry/bosh-init/archive/v0.0.81.tar.gz
+
+    boshInitURL="https://s3.amazonaws.com/bosh-init-artifacts/bosh-init-${boshInitVersion}-linux-amd64"
+
+    curl -sL "${boshInitURL}" -o "${HOME}/bin/bosh-init"
+    chmod +x "${HOME}/bin/bosh-init"
+    "${HOME}/bin/bosh-init" -v
+  } &>>"${HOME}/provision.log"
+}
+
+provision_bosh_director() {
+  echo "[provision] Deploying the BOSH Director using bosh-init"
+  {
+    chmod 0600 "${HOME}/.ssh/bosh.pem"
+
+    "${HOME}/bin/bosh-init" deploy "${HOME}/deployments/bosh.yml"
+
+    bosh -n target "https://${boshDirectorHost}:25555"
+    bosh login admin adminpa55
+
+    boshDirectorUUID="$(bosh status --uuid)"
+    if [[ "${cfDomain}" == "XIP" ]]
+    then
+      cfDomain="${cfIP}.xip.io"
+      export SKIP_SSL_VALIDATION="true"
+    fi
+  } &>>"${HOME}/provision.log"
+}
+
+install_spiff() {
+  echo "[provision] Installing spiff to ${HOME}/bin/spiff"
+  {
+    local _version="1.0.7"
+    local _url="https://github.com/cloudfoundry-incubator/spiff/releases/download/v${_version}/spiff_linux_amd64.zip"
+    if [[ ! -x "${HOME}/bin/spiff" ]]
+    then
+      curl -OL "${_url}"
+      unzip spiff_linux_amd64.zip
+      mv ./spiff "${HOME}/bin/spiff"
+      rm spiff_linux_amd64.zip
+    fi
+  } &>>"${HOME}/provision.log"
+}
+
+install_spruce() {
+  echo "[provision] Installing Spruce to ${HOME}/bin/spruce"
+  {
+    local _version="1.0.3"
+    local _url="https://github.com/geofffranks/spruce/releases/download/v${_version}/spruce-linux-amd64"
+
+    if [[ ! -x "${HOME}/bin/spruce" ]]
+    then
+      if ! curl -L "${_url}" -o "${HOME}/bin/spruce"
+      then
+        echo "Error downloading spruce: $?"
+      fi
+      chmod +x "${HOME}/bin/spruce"
+    fi
+  } &>>"${HOME}/provision.log"
+}
+
+provision_cf() {
+  if [[ -f "${HOME}/.rvm/environments/default" ]]
+  then source "${HOME}/.rvm/environments/default" &>/dev/null
+  fi
+  echo "[provision] Bootstrapping CF..."
+  {
+    cp "${HOME}/deployments/cf-${cfSize}.yml" "${HOME}/workspace/deployments/cf-${cfSize}.yml"
+    # TODO: Replace this with spruce!!!
+
+    # If cfRunSubdomain is set, then use it's value to replace the default subdomain. Otherwise (if empty), don't use a subdomain
+    if [[ -n "${cfRunSubdomain}" ]]
+    then cfRunSubdomainRE="s/run.\${cf-domain}/${cfRunSubdomain}.${cfDomain}/g"
+    else cfRunSubdomainRE="s/run.\${cf-domain}/${cfDomain}/g"
+    fi
+
+    # If cfAppsSubdomain is set, then use it's value to replace the default subdomain. Otherwise (if empty), don't use a subdomain
+    if [[ -n "${cfAppsSubdomain}" ]]
+    then cfAppsSubdomainRE="s/apps.\${cf-domain}/${cfAppsSubdomain}.${cfDomain}/g"
+    else cfAppsSubdomainRE="s/apps.\${cf-domain}/${cfDomain}/g"
+    fi
+
+    boshDirectorUUID="$(bosh status --uuid)"
+
+    /bin/sed -i \
+      -e "s/\${network}/${network}/g" \
+      -e "s/\${cf-subnet1-az}/${cfSubnet1AZ}/g" \
+      -e "s/\${cf-subnet2-az}/${cfSubnet2AZ}/g" \
+      -e "s/\${cf-eip}/${cfIP}/g" \
+      -e "s/\${cf-subnet1}/${cfSubnet1}/g" \
+      -e "s/\${cf-subnet2}/${cfSubnet2}/g" \
+      -e "s/\${bosh-director-uuid}/${boshDirectorUUID}/g" \
+      -e "s/\${bosh-subnet}/${boshSubnet}/g" \
+      -e "${cfRunSubdomainRE}" \
+      -e "${cfAppsSubdomainRE}" \
+      -e "s/\${cf-domain}/${cfDomain}/g" \
+      -e "s/\${cf-admin-pass}/${cfAdminPass}/g" \
+      -e "s/\${cf-pass}/${cfPass}/g" \
+      -e "s/\${cf-sg}/${cfSecurityGroup}/g" \
+      -e "s/\${lb-subnet1}/${lbSubnet1}/g" \
+      -e "s/\${lb-subnet1-az}/${cfSubnet1AZ}/g" \
+      -e "s/\${lb-subnet2-az}/${cfSubnet2AZ}/g" \
+      "${HOME}/workspace/deployments/cf-${cfSize}.yml"
+
+    if [[ -n "${cfPrivateDomains}" ]]
+    then
+      for domain in $(tr "," "\n" <<< "${cfPrivateDomains}" )
+      do
+        sed -i \
+          -e "s/^\(\s\+\)- \${cf-private-domains}/\1- ${domain}\n\1- \${cf-private-domains}/" \
+          "${HOME}/workspace/deployments/cf-${cfSize}.yml"
+      done
+      sed -i -e "s/^\s\+- \${cf-private-domains}//" \
+        "${HOME}/workspace/deployments/cf-${cfSize}.yml"
+    else
+      sed -i \
+        -e "s/^\(\s\+\)internal_only_domains:\$/\1internal_only_domains: []/" \
+        -e "s/^\s\+- \${cf-private-domains}//"  \
+        "${HOME}/workspace/deployments/cf-${cfSize}.yml"
+    fi
+
+    if [[ -n "${cfSecurityGroupAllows}" ]]
+    then
+      text=""
+      for cidr in $(tr "," "\n" <<< "${cfSecurityGroupAllows}")
+      do
+        if [[ -n "${cidr}" ]]
+        then
+          text="${text}{\"protocol\":\"all\",\"destination\":\"${cidr}\"},"
+        fi
+      done
+
+      if [[ -n "${text}" ]]
+      then
+        text=$(sed 's/,$//' <<< "${text}" )
+        sed -i \
+          -e "s|^\(\s\+additional_security_group_rules:\s\+\).*|\1[${text}]|" \
+          "${HOME}/workspace/deployments/cf-${cfSize}.yml"
+      fi
+    fi
+  }
+  provision_cf_release
+}
+
+provision_cf_release() {
+  # Upload the bosh release, set the deployment, and execute
+  echo "[provision] CF Release..."
+  {
+    bosh upload release --skip-if-exists "https://bosh.io/d/github.com/cloudfoundry/cf-release?v=${cfReleaseVersion}"
+    bosh deployment "${HOME}/workspace/deployments/cf-${cfSize}"
+    for attempt in {0..2}
+    do 
+      echo "Attempting bosh -n deploy (${attempt}/2)"
+      bosh -n deploy
+    done
+  } &>>"${HOME}/provision.log"
+}
+
+provision_base() {
+  provision_path
+  provision_ssh_keys
+  provision_os_packages
+  provision_rvm
+  provision_ruby
+  install_spiff
+  install_spruce
+}
+
+provision_bosh() {
+  if [[ -f "${HOME}/.rvm/environments/default" ]]
+  then source "${HOME}/.rvm/environments/default" &>/dev/null
+  fi
+  provision_bosh_workspace_disk
+  provision_bosh_cli
+  provision_bosh_init
+  provision_bosh_director
+}
+
+main() {
+
+  {
+    echo -e "\n\n${0} ${*}
+    AWS VPC   : ${awsVPC}
+    Bastion ID: ${bastionID}
+    Bastion AZ: ${bastionAZ}
+    "
+  } &>> "${HOME}/provision.log"
+
+  (( UID > 0 )) || fatal "[provision] Must not be run as root."
+
+  cd "${HOME}" || fatal "Could not cd ${HOME}, terminating."
+
+  [[ ${installDocker} != "true" ]] || true
+
+  [[ "${DEBUG:-}" != "true" ]] || set -x
+
+  echo "[provision] Provisioning! Detailed output may be found later at $HOME/provision.log"
+
+  case "${action}" in
+    (path)          provision_path ;;
+    (ssh_keys)      provision_ssh_keys ;;
+    (os_packages)   provision_os_packages ;;
+    (rvm)           provision_rvm ;;
+    (ruby)          provision_ruby ;;
+    (bosh_cli)      provision_bosh_cli ;;
+    (bosh_init)     provision_bosh_init ;;
+    (bosh_director) provision_bosh_director ;;
+    (base)          provision_base ;;
+    (bosh)          provision_bosh ;;
+    (cf)            provision_cf   ;;
+    (all)
+      provision_base
+      provision_bosh
+      provision_cf
+      ;;
+    (*)
+      log "$0 <all|base|bosh|cf>"
+      ;;
+  esac
+
+  echo "[provision] Complete."
+}
+
+action="${1}"
+shift || fail "action required as first argument."
+
+# Note that the values of the variables below are filled in before this 
+# template file is rendered and placed on the bastion server.
+awsKeyID=""
+awsAccessKey=""
+awsRegion=""
+awsVPC=""
+bastionID=""
+bastionAZ=""
+network=""
+boshSubnet=""
+cfIP=""
+cfSubnet1=""
+cfSubnet1AZ=""
+cfSubnet2=""
+cfSubnet2AZ=""
+lbSubnet1=""
+cfSecurityGroup=""
+cfDomain=""
+boshInitVersion=""
+cfSize=""
+installDocker=""
+cfReleaseVersion=""
+cfPrivateDomains=""
+cfSecurityGroupAllows=""
+cfRunSubdomain=""
+cfAppsSubdomain=""
+cfAdminPass=""
+cfPass=""
+
+backboneCountZ1=""
+apiCountZ1=""
+servicesCountZ1=""
+healthCountZ1=""
+runnerCountZ1=""
+backboneCountZ2=""
+apiCountZ2=""
+servicesCountZ2=""
+healthCountZ2=""
+runnerCountZ2=""
+
+backbonePool=""
+dataPool=""
+publicHAProxyPool=""
+privateHAProxyPool=""
+apiPool=""
+servicesPool=""
+healthPool=""
+runnerPool=""
+
+# installLogsearch=""
+# dockerSubnet=""
+# lsSubnet1=""
+# lsSubnet1AZ=""
+
+SKIP_SSL_VALIDATION=false
+
+boshDirectorHost="${network}.1.6"
+
+main "${@}"
+
+exit 0
+
