@@ -45,7 +45,7 @@ resource_pools:
     instance_type: m3.medium
 
 compilation:
-  workers: 2
+  workers: 6
   network: cf_private
   reuse_compilation_vms: true
   cloud_properties:
@@ -60,20 +60,61 @@ update:
   update_watch_time: 5000-600000
 
 jobs:
-- name: database-z1
+- name: nats_z1
   instances: 1
+  resource_pool: small_z1
   templates:
-  - {name: consul_agent, release: cf }
-  - {name: postgres, release:  cf }
+  - {name: nats, release: cf}
+  - {name: nats_stream_forwarder, release: cf}
+  - {name: metron_agent, release: cf}
+  networks:
+  - name: cf_private
+    static_ips: [${network}.16.103]
+
+- name: etcd_z1
+  instances: 1
+  resource_pool: small_z1
+  persistent_disk: 102400
+  templates:
+  - {name: etcd, release: cf}
+  - {name: etcd_metrics_server, release: cf}
+  - {name: metron_agent, release: cf}
+  networks:
+  - name: cf_private
+    static_ips: [${network}.16.104]
+  properties:
+    etcd_metrics_server:
+      nats:
+        machines: [${network}.16.103]
+        password: ${cf-nats-pass}
+        username: nats
+
+- name: consul_z1
+  instances: 1
+  persistent_disk: 1024
+  resource_pool: small_z1
+  templates:
+  - {name: metron_agent, release: cf}
+  - {name: consul_agent, release: cf}
+  networks:
+  - name: cf_private
+    static_ips: [${network}.16.105]
+  properties:
+    consul:
+      agent:
+        mode: server
+
+- name: blobstore_z1
+  instances: 1
+  persistent_disk: 102400
+  resource_pool: small_z1
+  templates:
   - {name: blobstore, release: cf}
   - {name: metron_agent, release: cf}
   - {name: route_registrar, release: cf}
-  persistent_disk: 102400 # For PostgreSQL & Blobstore
-  persistent_disk: 1024
+  - {name: consul_agent, release: cf}
   networks:
-    - { name: cf_private, static_ips: [${network}.16.101]} # For PostgreSQL
-  update:
-    serial: true # For PostgreSQL
+  - name: cf_private
   properties:
     consul:
       agent:
@@ -89,36 +130,45 @@ jobs:
         uris:
         - "blobstore.${cf-domain}"
 
-- name: messaging-z1 # "backbone"
+- name: postgres_z1
   instances: 1
-  templates:
-  - { name: consul_agent, release: cf }
-  - { name: etcd, release: cf }
-  - { name: etcd_metrics_server, release: cf }
-  - { name: nats, release: cf }
-  - { name: nats_stream_forwarder, release: cf }
-  - { name: doppler, release: cf }
-  - { name: syslog_drain_binder, release: cf }
-  - { name: metron_agent, release: cf }
   persistent_disk: 1024
+  resource_pool: small_z1
+  templates:
+  - {name: postgres, release: cf}
+  - {name: metron_agent, release: cf}
   networks:
-    - { name: cf_private, static_ips: [${network}.16.103]}
-  properties:
-    etcd_metrics_server:
-      nats:
-        machines: [${network}.16.103]
-        password: ${cf-nats-pass}
-        username: nats
+  - name: cf_private
+    static_ips: [${network}.16.101]
+  update:
+    serial: true
 
+- name: api_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: cloud_controller_ng, release: cf}
+  - {name: cloud_controller_worker, release: cf}
+  - {name: cloud_controller_clock, release: cf}
+  - {name: metron_agent, release: cf}
+  - {name: route_registrar, release: cf}
+  - {name: consul_agent, release: cf}
+  networks:
+  - name: cf_private
+  properties:
     consul:
       agent:
-        mode: server
+        services:
+          cloud_controller_ng: {}
+    route_registrar:
+      routes:
+      - name: api
+        registration_interval: 20s
+        port: 9022
+        uris:
+        - "api.${cf-domain}"
 
-    doppler: {zone: z1}
-    doppler_endpoint:
-      shared_secret: ${cf-pass}
-
-- name: haproxy-z1
+- name: ha_proxy_z1
   instances: 1
   resource_pool: small_z1
   templates:
@@ -137,25 +187,82 @@ jobs:
       servers:
         z1: [${network}.16.102]
 
-- name: api-z1
+- name: hm9000_z1
   instances: 1
+  resource_pool: small_z1
   templates:
-  - { name: consul_agent, release: cf }
-  - { name: routing-api, release: cf }
-  - { name: gorouter, release: cf }
-  - { name: cloud_controller_ng, release: cf }
-  - { name: cloud_controller_worker, release: cf}
-  - { name: uaa, release: cf}
-  - { name: metron_agent, release: cf }
-  - { name: route_registrar, release: cf }
+  - {name: hm9000, release: cf}
+  - {name: metron_agent, release: cf}
+  - {name: route_registrar, release: cf}
   networks:
-    - { name: cf_private, static_ips: [${network}.16.103]}
+  - name: cf_private
   properties:
-    dropsonde: {enabled: true}
-    
+    route_registrar:
+      routes:
+      - name: hm9000
+        registration_interval: 20s
+        port: 5155
+        uris:
+        - "hm9000.${cf-domain}"
+
+- name: doppler_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: doppler, release: cf}
+  networks:
+  - name: cf_private
+  properties:
+    doppler: {zone: z1}
+    doppler_endpoint:
+      shared_secret: ${cf-pass}
+
+- name: loggregator_trafficcontroller_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: loggregator_trafficcontroller, release: cf}
+  - {name: metron_agent, release: cf}
+  - {name: route_registrar, release: cf}
+  networks:
+  - name: cf_private
+  properties:
+    traffic_controller: {zone: z1}
+    route_registrar:
+      routes:
+      - name: doppler
+        registration_interval: 20s
+        port: 8081
+        uris:
+        - "doppler.${cf-domain}"
+      - name: loggregator
+        registration_interval: 20s
+        port: 8080
+        uris:
+          - "loggregator.${cf-domain}"
+
+- name: uaa_z1
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - {name: uaa, release: cf}
+  - {name: metron_agent, release: cf}
+  - {name: route_registrar, release: cf}
+  networks:
+  - name: cf_private
+  properties:
     login:
       catalina_opts: -Xmx768m -XX:MaxPermSize=256m
-
+    route_registrar:
+      routes:
+      - name: uaa
+        registration_interval: 20s
+        port: 8080
+        uris:
+        - "uaa.${cf-domain}"
+        - "*.uaa.${cf-domain}"
+        - "login.${cf-domain}"
+        - "*.login.${cf-domain}"
     uaa:
       admin:
         client_secret: ${cf-pass}
@@ -177,87 +284,29 @@ jobs:
       roles:
       - {name: uaaadmin, password: ${cf-pass}, tag: admin}
 
-    route_registrar:
-      routes:
-      - name: api
-        registration_interval: 20s
-        port: 9022
-        uris:
-        - "api.${cf-domain}"
-
-      - name: uaa
-        registration_interval: 20s
-        port: 8080
-        uris:
-        - "uaa.${cf-domain}"
-        - "*.uaa.${cf-domain}"
-        - "login.${cf-domain}"
-        - "*.login.${cf-domain}"
-
-    consul:
-      agent:
-        services:
-          cloud_controller_ng: {}
-
-- name: services-z1
+- name: router_z1
   instances: 1
+  resource_pool: small_z1
   templates:
-  - { name: consul_agent, release: cf }
-  - { name: cloud_controller_worker, release: cf }
-  - { name: metron_agent, release: cf }
-  - { name: route_registrar, release: cf }
-  networks:
-    - { name: cf_private } # , static_ips: [${network}.16.103]}
-  properties:
-
-- name: health-z1
-  instances: 1
-  templates:
-  - {name: loggregator_trafficcontroller, release: cf}
-  - {name: hm9000, release: cf}
-  - {name: cloud_controller_clock, release: cf}
+  - {name: gorouter, release: cf}
   - {name: metron_agent, release: cf}
-  - {name: route_registrar, release: cf}
+  - {name: consul_agent, release: cf}
   networks:
-    - { name: cf_private } # , static_ips: [${network}.16.103]}
+  - name: cf_private
+    static_ips: [${network}.16.102]
   properties:
-    consul:
-      agent:
-        services:
-          cloud_controller_ng: {}
+    dropsonde: {enabled: true}
 
-    route_registrar:
-      routes:
-      - name: hm9000
-        registration_interval: 20s
-        port: 5155
-        uris:
-        - "hm9000.${cf-domain}"
-
-    traffic_controller: {zone: z1}
-    route_registrar:
-      routes:
-      - name: doppler
-        registration_interval: 20s
-        port: 8081
-        uris:
-        - "doppler.${cf-domain}"
-
-      - name: loggregator
-        registration_interval: 20s
-        port: 8080
-        uris:
-          - "loggregator.${cf-domain}"
-
-- name: runners-z1
+- name: runner_z1
   instances: 1
+  resource_pool: small_z1
   templates:
   - {name: dea_next, release: cf}
   - {name: dea_logging_agent, release: cf}
   - {name: metron_agent, release: cf}
   - {name: consul_agent, release: cf}
   networks:
-    - { name: cf_private } # , static_ips: [${network}.16.103]}
+  - name: cf_private
   properties:
     dea_next: {zone: z1}
 
