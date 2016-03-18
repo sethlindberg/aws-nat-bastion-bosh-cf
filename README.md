@@ -24,10 +24,10 @@ For full production systems it is advised that your Bsation and BOSH Director ar
 
 # Preparation
 
-First, this project uses `direnv`, if you do not have `direnv` available please 
+First, this project uses `direnv`, if you do not have `direnv` available please
 first install it: (direnv.net)[http://direnv.net]
 
-Be sure to run `direnv` allow when you change in to this project directory. 
+Be sure to run `direnv` allow when you change in to this project directory.
 
 
 To prepare the environment in order to run the automation, first run the following:
@@ -37,32 +37,69 @@ make prepare
 ```
 
 Notes
-* it is assumed that your user has write priviliges to `/usr/local/bin`
+* it is assumed that your user has write privileges to `/usr/local/bin`
 * The `direnv` hook adds `./bin` to your PATH in the current shell session only.
+* If you will be finding new stemcell ID's be sure to install `awscli`
 
 # Deploying a BOSH VPC
 
 First you will need to add your credentials to the appropriate location.
 
 Copy the example file to the `terraform.tfvars` file:
-```
+```sh
 cp terraform/aws/terraform.tfvars.example terraform/aws/terraform.tfvars
 ```
 Next edit the file and replace the values with your AWS account credentials.
 
-## Deploying
+## Create the VPC, NAT and Bastion (Jump Box)
 
-In order to *deploy* a VPC,
+In order to *deploy* a VPC, NAT and Bastion Box:
 
+```sh
+make plan
+make apply
+make provision-base
 ```
-make deploy
+
+## Create BOSH Director (via bosh-init)
+
+```sh
+make provision-bosh
 ```
 
-## Destorying
+## Destroying Everything
 
 In order to *destroy* a previously deployed VPC,
 
-```
+```sh
 make destroy
 ```
 
+## EC2 Image ID Updates
+
+We found the AMI ID's by getting the product code from this website.
+Then ran the following code substituting in the product code value:
+```sh
+make centos-ami-ids
+```
+Note that you have to first run `aws configure` to setup your AWS credentials.
+The outputed values should replace the old ones within the `variables.tf` file.
+Specifically the `variable "aws_centos_ami" {` section.
+
+## Troubleshooting
+
+If this message is received:
+```
+Error applying plan:
+
+1 error(s) occurred:
+
+* aws_instance.bastion: Error launching source instance: OptInRequired: In order to use this AWS Marketplace product you need to accept terms and subscribe. To do so please visit http://aws.amazon.com/marketplace/pp?sku=aw0evgkw8e5c1q413zgy5pjce
+	status code: 401, request id:
+
+Terraform does not automatically rollback in the face of errors.
+Instead, your Terraform state file has been partially updated with
+any resources that successfully completed. Please address the error
+above and apply again to incrementally change your infrastructure.
+```
+Go to the URL in the error message and click "Manual Launch" tab (for EC2 APIs / CLI) and click the giant orange button to "Accept Software Terms". Then re-run the commands.
