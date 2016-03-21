@@ -11,8 +11,9 @@ Usage:
 
 Actions:
 
-  prepare   - Prepare environment for running automation.
-  provision - Provision jump box.
+  prepare        - Prepare environment for running automation.
+  provision      - Provision jump box.
+  centos-ami-ids - List latest centos-ami-ids (requires awscli)
 
 USAGE
 }
@@ -38,19 +39,19 @@ check_install_terraform()  {
     _install=true
   else
     if [[ "$(terraform -v | awk '/Terraform v/{print $2}')" != "v${_version}" ]]
-    then 
+    then
       _install=true
-    fi 
+    fi
   fi
 
   if [[ ${_install} == true ]]
-  then 
+  then
     log "Installing terraform CLI ${_version} ..."
     curl -sOL "https://dl.bintray.com/mitchellh/terraform/terraform_${_version}_darwin_amd64.zip"
     unzip -d "/usr/local/bin" "terraform_${_version}_darwin_amd64.zip"
     rm -f "terraform_${_version}_darwin_amd64.zip"
     log "OK, terraform CLI ${_version} installed."
-  else 
+  else
     log "OK, terraform CLI is ${_version}"
   fi
 }
@@ -60,7 +61,7 @@ provision_vpc() {
 
   local _action="${1}"
 
-  case ${_action} in 
+  case ${_action} in
     (plan)
       terraform get -update
       terraform plan -module-depth=-1 -var-file terraform.tfvars -out terraform.tfplan
@@ -93,7 +94,7 @@ bastion() {
 
   _bastionIP="$(tf_var bastion_ip)"
   _keyPath="$(sed -e "s#^~#${HOME}#" < <(tf_var aws_key_path))"
-  
+
   local _action="${1}"
   case "${_action}" in
     (ip)  echo "${_bastionIP}" ;;
@@ -156,7 +157,7 @@ prepare_bastion_provision_script() {
 
   for _job in backbone api services health runner
   do
-    for _zone in Z1 Z2 
+    for _zone in Z1 Z2
     do
       local _jobName _lcJobName _key _value
       _jobName="${_job}_${_zone}_count"
@@ -236,7 +237,7 @@ scp_file() {
   _bastionIP="$(tf_var bastion_ip)"
   _keyPath="$(sed -e "s#^~#${HOME}#" < <(tf_var aws_key_path))"
 
-  _src="${1}" 
+  _src="${1}"
   _dest="${2}"
   _index=1
   _maxAttempts=10
@@ -266,9 +267,21 @@ provision() {
   _bastionIP="$(tf_var bastion_ip)"
   _size="$(tf_var cf_size)"
   _keyPath="$(sed -e "s#^~#${HOME}#" < <(tf_var aws_key_path))"
-  
+
   prepare_bastion_provision_script # Wait until SSH on Bastion server is working
   scp_file "/tmp/provision-bastion" "provision"
+
+  _cmd="mkdir -p ~/.ssh ; chmod 0755 ~/.ssh"
+  ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
+
+  for file in .ssh/*.pem
+  do
+    fileName="${file}"
+    scp_file "${file}" ".ssh/${fileName}"
+
+    _cmd="chmod 0644 ~/.ssh/${fileName}"
+    ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
+  done
 
 	_cmd="chmod +x \${HOME}/provision"
   ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
@@ -281,6 +294,28 @@ provision() {
 
 	_cmd="DEBUG=true \${HOME}/provision ${_action}"
   ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
+}
+
+find_centos_7_ami_ids() {
+  regions=(
+    us-east-1
+    us-west-1
+    us-west-2
+    ap-northeast-1
+    ap-southeast-1
+    ap-southeast-2
+    eu-west-1
+    sa-east-1
+  )
+
+  productCode="aw0evgkw8e5c1q413zgy5pjce" # Product Code for CentOS 7
+  for region in "${regions[@]}"
+  do
+    printf "${region} = $( jq '.Images[0].ImageId' <(
+    aws --region "${region}" ec2 describe-images --owners aws-marketplace \
+    --filters Name=product-code,Values="${productCode}")
+    )\n"
+  done
 }
 
 main() {
@@ -300,6 +335,9 @@ main() {
       ;;
     (bastion)
       bastion "$@"
+      ;;
+    (centos-ami-ids)
+      find_centos_7_ami_ids "$@"
       ;;
     (*|help|-h)
       usage

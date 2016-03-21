@@ -4,6 +4,12 @@ all: plan apply provision
 
 deploy: apply
 
+centos-ami-ids:
+	./bin/nbb centos-ami-ids
+
+prepare:
+	./bin/nbb prepare
+
 plan:
 	./bin/nbb vpc plan
 

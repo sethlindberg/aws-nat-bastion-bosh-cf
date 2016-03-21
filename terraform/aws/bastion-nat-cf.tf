@@ -120,18 +120,13 @@ resource "aws_instance" "bastion" {
   }
 
   provisioner "file" {
-    source = "${path.module}/../../.ssh/bosh.pem"
-    destination = "/home/centos/.ssh/bosh.pem"
-  }
-
-  provisioner "file" {
     source = "${path.module}/../../sshkeys"
     destination = "/home/centos/"
   }
 
   provisioner "remote-exec" {
     inline = [
-      "mkdir -p ${HOME}/{bin,config,deployments}",
+      "mkdir -p ${HOME}/{.ssh,bin,config,deployments}",
       "chmod 0600 ${HOME}/.ssh/bosh.pem",
     ]
   }
@@ -321,4 +316,3 @@ output "api_resource_pool"             { value = "${var.api_resource_pool}" }
 output "services_resource_pool"        { value = "${var.services_resource_pool}" }
 output "health_resource_pool"          { value = "${var.health_resource_pool}" }
 output "runner_resource_pool"          { value = "${var.runner_resource_pool}" }
-

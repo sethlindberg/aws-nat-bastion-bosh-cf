@@ -22,14 +22,14 @@ variable "bosh" {
 variable "aws_centos_ami" {
   type = "map"
   default = {
-    us-east-1 = "ami-61bbf104"
-    us-west-1 = "ami-ba3c3bff"
-    us-west-2 = "ami-3425be04"
-    ap-northeast-1 = "ami-9392dc92"
-    ap-southeast-1 = "ami-dcbeed8e"
-    ap-southeast-2 = "ami-89e88db3"
-    eu-west-1 = "ami-af6faad8"
-    sa-east-1 = "ami-73ee416e"
+  us-east-1 = "ami-6d1c2007"
+  us-west-1 = "ami-af4333cf"
+  us-west-2 = "ami-d2c924b2"
+  ap-northeast-1 = "ami-eec1c380"
+  ap-southeast-1 = "ami-f068a193"
+  ap-southeast-2 = "ami-fedafc9d"
+  eu-west-1 = "ami-7abd0209"
+  sa-east-1 = "ami-26b93b4a"
   }
 }
 
@@ -211,4 +211,3 @@ variable "api_resource_pool"             { default = "medium" }
 variable "services_resource_pool"        { default = "medium" }
 variable "health_resource_pool"          { default = "medium" }
 variable "runner_resource_pool"          { default = "runner" }
-
