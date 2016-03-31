@@ -76,8 +76,8 @@ variable "cf" {
 variable "cf1_az" {
   type = "map"
   default = {
-    us-east-1 = "us-east-1c"
-    us-west-1 = "us-west-1c"
+    us-east-1 = "us-east-1a"
+    us-west-1 = "us-west-1a"
     us-west-2 = "us-west-2a"
     ap-northeast-1 = "ap-northeast-1a"
     ap-southeast-1 = "ap-southeast-1a"
