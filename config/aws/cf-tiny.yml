@@ -69,7 +69,6 @@ jobs:
   - {name: metron_agent, release: cf}
   - {name: route_registrar, release: cf}
   persistent_disk: 102400 # For PostgreSQL & Blobstore
-  persistent_disk: 1024
   networks:
     - { name: cf_private, static_ips: [${network}.16.101]} # For PostgreSQL
   update:
@@ -226,6 +225,7 @@ jobs:
         services:
           cloud_controller_ng: {}
 
+    traffic_controller: {zone: z1}
     route_registrar:
       routes:
       - name: hm9000
@@ -234,8 +234,6 @@ jobs:
         uris:
         - "hm9000.${cf-domain}"
 
-    traffic_controller: {zone: z1}
-    route_registrar:
       routes:
       - name: doppler
         registration_interval: 20s

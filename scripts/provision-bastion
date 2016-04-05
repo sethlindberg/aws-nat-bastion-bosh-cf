@@ -121,6 +121,8 @@ provision_bosh_workspace_disk() {
         <<< "LABEL=workspace ${HOME}/workspace ext4 defaults,discard 0 0"
       mkdir -p "${HOME}/workspace"
       sudo mount -a
+      # When mounted, initially owned by root
+      sudo chown "${USER}" "${HOME}/workspace"
     else
       sudo chown -R "${USER}" "${HOME}/workspace"
     fi
@@ -228,6 +230,8 @@ provision_cf() {
 
     boshDirectorUUID="$(bosh status --uuid)"
 
+    echo "We found bosh UUID ${boshDirectorUUID}"
+
     /bin/sed -i \
       -e "s/\${network}/${network}/g" \
       -e "s/\${cf-subnet1-az}/${cfSubnet1AZ}/g" \
@@ -246,7 +250,10 @@ provision_cf() {
       -e "s/\${lb-subnet1}/${lbSubnet1}/g" \
       -e "s/\${lb-subnet1-az}/${cfSubnet1AZ}/g" \
       -e "s/\${lb-subnet2-az}/${cfSubnet2AZ}/g" \
+      -e "s/\${bosh-stemcell-version}/${cfBOSHUbuntuStemCell}" \
       "${HOME}/workspace/deployments/cf-${cfSize}.yml"
+
+    echo "Updated ${HOME}/workspace/deployments/cf-${cfSize}.yml"
 
     if [[ -n "${cfPrivateDomains}" ]]
     then
@@ -398,6 +405,7 @@ cfRunSubdomain=""
 cfAppsSubdomain=""
 cfAdminPass=""
 cfPass=""
+cfBOSHUbuntuStemCell="3215"
 
 backboneCountZ1=""
 apiCountZ1=""
