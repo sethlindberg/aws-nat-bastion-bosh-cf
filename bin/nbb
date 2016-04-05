@@ -31,7 +31,7 @@ tf_var() {
 }
 
 check_install_terraform()  {
-  local _version=0.6.11 _install=false
+  local _version=0.6.14 _install=false
 
   log "Checking for terraform CLI ${_version} ..."
   if ! command -v terraform &>/dev/null
@@ -47,7 +47,7 @@ check_install_terraform()  {
   if [[ ${_install} == true ]]
   then
     log "Installing terraform CLI ${_version} ..."
-    curl -sOL "https://dl.bintray.com/mitchellh/terraform/terraform_${_version}_darwin_amd64.zip"
+    curl -sOL "https://releases.hashicorp.com/terraform/${_version}/terraform_${_version}_darwin_amd64.zip"
     unzip -d "/usr/local/bin" "terraform_${_version}_darwin_amd64.zip"
     rm -f "terraform_${_version}_darwin_amd64.zip"
     log "OK, terraform CLI ${_version} installed."
@@ -154,6 +154,7 @@ prepare_bastion_provision_script() {
   replace "${_tmp}" '^cfRunSubdomain=.*' "cfRunSubdomain=\"$(tf_var cf_run_subdomain)\""
   replace "${_tmp}" '^cfAppsSubdomain=.*' "cfAppsSubdomain=\"$(tf_var cf_apps_subdomain)\""
   replace "${_tmp}" '^cfPass=.*' "cfPass=\"$(tf_var cf_pass)\""
+#  replace "${_tmp}" '^cfBOSHUbuntuStemCell=.*' "cfPass=\"$(tf_var cf_bosh_ubuntu_stem_cell)\""
 
   for _job in backbone api services health runner
   do
@@ -274,9 +275,12 @@ provision() {
   _cmd="mkdir -p ~/.ssh ; chmod 0755 ~/.ssh"
   ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
 
-  for file in .ssh/*.pem
+  # runs from terraform/aws/ so we need the ../..
+  for file in ../../sshkeys/*.pem
   do
-    fileName="${file}"
+    fileName="$(basename ${file})"
+
+    echo "scping ${file} to ~/.ssh/${fileName}"
     scp_file "${file}" ".ssh/${fileName}"
 
     _cmd="chmod 0644 ~/.ssh/${fileName}"
@@ -290,8 +294,8 @@ provision() {
   scp_file "/tmp/bosh.yml" "deployments/bosh.yml"
 
   prepare_cf_tiny_yaml_manifest
-  scp_file "/tmp/cf-${_size}.yml" "deployments/cf-${_size}.yml"
-
+  scp_file "/tmp/cf-${_size}.yml" "workspace/deployments/cf-${_size}.yml"
+  
 	_cmd="DEBUG=true \${HOME}/provision ${_action}"
   ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
 }
@@ -345,6 +349,6 @@ main() {
   esac
 }
 
-main "${@}"
+main "${@-help}"
 
 exit $?
