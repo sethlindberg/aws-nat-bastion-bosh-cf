@@ -249,6 +249,8 @@ scp_file() {
     echo "Attempting to scp to centos@${_bastionIP}... (${_index}/${_maxAttempts})"
     ssh -o StrictHostKeyChecking=no -i "${_keyPath}" "centos@${_bastionIP}" \
       "[[ -d deployments ]] || mkdir -p deployments"
+    ssh -o StrictHostKeyChecking=no -i "${_keyPath}" "centos@${_bastionIP}" \
+      "[[ -d workspace/deployments ]] || mkdir -p workspace/deployments"
     scp -o StrictHostKeyChecking=no -i "${_keyPath}" "${_src}" "centos@${_bastionIP}:${_dest}"
     case $? in
       (0) echo "${_index}> Success"; break ;;
@@ -294,7 +296,7 @@ provision() {
   scp_file "/tmp/bosh.yml" "deployments/bosh.yml"
 
   prepare_cf_tiny_yaml_manifest
-  scp_file "/tmp/cf-${_size}.yml" "workspace/deployments/cf-${_size}.yml"
+  scp_file "/tmp/cf-${_size}.yml" "deployments/cf-${_size}.yml"
   
 	_cmd="DEBUG=true \${HOME}/provision ${_action}"
   ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"

@@ -250,7 +250,7 @@ provision_cf() {
       -e "s/\${lb-subnet1}/${lbSubnet1}/g" \
       -e "s/\${lb-subnet1-az}/${cfSubnet1AZ}/g" \
       -e "s/\${lb-subnet2-az}/${cfSubnet2AZ}/g" \
-      -e "s/\${bosh-stemcell-version}/${cfBOSHUbuntuStemCell}" \
+      -e "s/\${bosh-stemcell-version}/${cfBOSHUbuntuStemCell}/g" \
       "${HOME}/workspace/deployments/cf-${cfSize}.yml"
 
     echo "Updated ${HOME}/workspace/deployments/cf-${cfSize}.yml"
