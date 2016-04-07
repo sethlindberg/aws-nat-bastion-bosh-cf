@@ -82,7 +82,7 @@ jobs:
       address: ${network}.1.6
       host: ${network}.1.6
       db: *db
-      http: {user: admin, password: adminpa55, port: 25777}
+      http: {user: admin, password: admin, port: 25777}
       username: admin
       password: admin
       port: 25777

@@ -9,13 +9,15 @@ networks:
 - name: cf_private
   type: manual
   subnets:
-  - range: ${network}.16.0/24
-    gateway: ${network}.16.1
+  - range: ${network}.04.0/24
+    gateway: ${network}.04.1
     dns: [${network}.0.2]
-    reserved: ["${network}.16.2 - ${network}.16.3"]
-    static: ["${network}.16.100 - ${network}.16.105"]
+    reserved: ["${network}.04.2 - ${network}.04.3"]
+    static: ["${network}.04.100 - ${network}.04.105"]
     cloud_properties:
       subnet: ${cf-subnet1}
+      security_groups:
+        - ${cf-sg}
 
 - name: cf_public
   type: manual
@@ -26,9 +28,6 @@ networks:
     reserved: ["${network}.0.2 - ${network}.0.10"]
     cloud_properties:
       subnet: ${bosh-subnet}
-      security_groups:
-        - ${cf-sg}
-        - ${bosh-sg}
 
 - name: elastic
   type: vip
@@ -71,7 +70,7 @@ jobs:
   - {name: route_registrar, release: cf}
   persistent_disk: 102400 # For PostgreSQL & Blobstore
   networks:
-    - { name: cf_private, static_ips: [${network}.16.101]} # For PostgreSQL
+    - { name: cf_private, static_ips: [${network}.04.101]} # For PostgreSQL
   update:
     serial: true # For PostgreSQL
   properties:
@@ -103,11 +102,11 @@ jobs:
   - { name: metron_agent, release: cf }
   persistent_disk: 1024
   networks:
-    - { name: cf_private, static_ips: [${network}.16.103]}
+    - { name: cf_private, static_ips: [${network}.04.103]}
   properties:
     etcd_metrics_server:
       nats:
-        machines: [${network}.16.103]
+        machines: [${network}.04.103]
         password: ${cf-nats-pass}
         username: nats
 
@@ -136,7 +135,7 @@ jobs:
         ${cf-haproxy-ssl-pem}
     router:
       servers:
-        z1: [${network}.16.102]
+        z1: [${network}.04.102]
 
 - name: api-z1
   instances: 1
@@ -151,7 +150,7 @@ jobs:
   - { name: metron_agent, release: cf }
   - { name: route_registrar, release: cf }
   networks:
-    - { name: cf_private, static_ips: [${network}.16.104]}
+    - { name: cf_private, static_ips: [${network}.04.104]}
   properties:
     dropsonde: {enabled: true}
     
@@ -171,7 +170,7 @@ jobs:
         users:
         - admin|${cf-pass}|scim.write,scim.read,openid,cloud_controller.admin,doppler.firehose,routing.router_groups.read
     uaadb:
-      address: ${network}.16.101
+      address: ${network}.04.101
       databases:
       - {name: uaadb, tag: uaa}
       db_scheme: postgresql
@@ -201,18 +200,6 @@ jobs:
         services:
           cloud_controller_ng: {}
 
-- name: services-z1
-  instances: 1
-  resource_pool: small_z1
-  templates:
-  - { name: consul_agent, release: cf }
-  - { name: cloud_controller_worker, release: cf }
-  - { name: metron_agent, release: cf }
-  - { name: route_registrar, release: cf }
-  networks:
-    - { name: cf_private } # , static_ips: [${network}.16.103]}
-  properties: {}
-
 - name: health-z1
   instances: 1
   resource_pool: small_z1
@@ -223,7 +210,7 @@ jobs:
   - {name: metron_agent, release: cf}
   - {name: route_registrar, release: cf}
   networks:
-    - { name: cf_private } # , static_ips: [${network}.16.103]}
+    - { name: cf_private } # , static_ips: [${network}.04.103]}
   properties:
     consul:
       agent:
@@ -260,7 +247,7 @@ jobs:
   - {name: metron_agent, release: cf}
   - {name: consul_agent, release: cf}
   networks:
-    - { name: cf_private } # , static_ips: [${network}.16.103]}
+    - { name: cf_private } # , static_ips: [${network}.04.103]}
   properties:
     dea_next: {zone: z1}
 
@@ -337,7 +324,7 @@ properties:
     staging_upload_password: ${cf-pass}
     staging_upload_user: staging_upload_user
   ccdb:
-    address: ${network}.16.101
+    address: ${network}.04.101
     databases:
     - {name: ccdb, tag: cc}
     db_scheme: postgres
@@ -349,7 +336,7 @@ properties:
       log_level: null
       servers:
         lan:
-        - ${network}.16.105
+        - ${network}.04.105
     encrypt_keys:
     - ${cf-pass}
     require_ssl: false
@@ -374,7 +361,7 @@ properties:
   description: Cloud Foundry sponsored by Pivotal
   domain: ${cf-domain}
   etcd:
-    machines: [${network}.16.104]
+    machines: [${network}.04.104]
     peer_require_ssl: false
     require_ssl: false
   hm9000:
@@ -384,7 +371,7 @@ properties:
     port: 4443
   loggregator:
     etcd:
-      machines: [${network}.16.104]
+      machines: [${network}.04.104]
   loggregator_endpoint:
     shared_secret: ${cf-pass}
   metron_agent:
@@ -393,7 +380,7 @@ properties:
   metron_endpoint:
     shared_secret: ${cf-pass}
   nats:
-    machines: [${network}.16.103]
+    machines: [${network}.04.103]
     password: ${cf-pass}
     port: 4222
     user: nats
