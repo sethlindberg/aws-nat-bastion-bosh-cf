@@ -11,8 +11,8 @@ variable "bosh" {
   default =  {
     version = "255.2"
     sha1 = "b08fefd771b33f209c3b844b5d316429523c78b1"
-    aws_cpi_version = "44"
-    aws_cpi_sha1 = "a1fe03071e8b9bf1fa97a4022151081bf144c8bc"
+    aws_cpi_version = "48"
+    aws_cpi_sha1 = "2abfa1bed326238861e247a10674acf4f7ac48b8"
     type = "ruby"
     director_vm_size = "m3.medium"
     init_version = "0.0.81"

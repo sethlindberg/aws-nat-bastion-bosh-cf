@@ -205,6 +205,10 @@ output "aws_secret_key" {
 	value = "${var.aws_secret_key}"
 }
 
+output "aws_key_name" {
+	value = "${var.aws_key_name}"
+}
+
 output "aws_region" {
 	value = "${var.aws_region}"
 }

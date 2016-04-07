@@ -62,6 +62,7 @@ update:
 jobs:
 - name: database-z1
   instances: 1
+  resource_pool: small_z1
   templates:
   - {name: consul_agent, release: cf }
   - {name: postgres, release:  cf }
@@ -90,6 +91,7 @@ jobs:
 
 - name: messaging-z1 # "backbone"
   instances: 1
+  resource_pool: small_z1
   templates:
   - { name: consul_agent, release: cf }
   - { name: etcd, release: cf }
@@ -138,6 +140,7 @@ jobs:
 
 - name: api-z1
   instances: 1
+  resource_pool: small_z1
   templates:
   - { name: consul_agent, release: cf }
   - { name: routing-api, release: cf }
@@ -148,7 +151,7 @@ jobs:
   - { name: metron_agent, release: cf }
   - { name: route_registrar, release: cf }
   networks:
-    - { name: cf_private, static_ips: [${network}.16.103]}
+    - { name: cf_private, static_ips: [${network}.16.104]}
   properties:
     dropsonde: {enabled: true}
     
@@ -200,6 +203,7 @@ jobs:
 
 - name: services-z1
   instances: 1
+  resource_pool: small_z1
   templates:
   - { name: consul_agent, release: cf }
   - { name: cloud_controller_worker, release: cf }
@@ -207,10 +211,11 @@ jobs:
   - { name: route_registrar, release: cf }
   networks:
     - { name: cf_private } # , static_ips: [${network}.16.103]}
-  properties:
+  properties: {}
 
 - name: health-z1
   instances: 1
+  resource_pool: small_z1
   templates:
   - {name: loggregator_trafficcontroller, release: cf}
   - {name: hm9000, release: cf}
@@ -234,7 +239,6 @@ jobs:
         uris:
         - "hm9000.${cf-domain}"
 
-      routes:
       - name: doppler
         registration_interval: 20s
         port: 8081
@@ -249,6 +253,7 @@ jobs:
 
 - name: runners-z1
   instances: 1
+  resource_pool: small_z1
   templates:
   - {name: dea_next, release: cf}
   - {name: dea_logging_agent, release: cf}

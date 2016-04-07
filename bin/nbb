@@ -201,6 +201,7 @@ prepare_bosh_yaml_manifest() {
   replace "${_tmp}" "\${centos_stemcell_sha1}" "$(tf_var "centos_stemcell_sha1")"
   replace "${_tmp}" "\${aws-access_key}" "$(tf_var "aws_access_key")"
   replace "${_tmp}" "\${aws-secret_key}" "$(tf_var "aws_secret_key")"
+  replace "${_tmp}" "\${aws-key_name}" "$(tf_var "aws_key_name")"
   replace "${_tmp}" "\${aws-region}" "$(tf_var "aws_region")"
   replace "${_tmp}" "\${aws-public-ip}" "$(tf_var "cf_api_ip")"
   replace "${_tmp}" "\${aws-security-group}" "$(tf_var "cf_sg_id")"
