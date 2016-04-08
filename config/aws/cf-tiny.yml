@@ -15,7 +15,7 @@ networks:
     reserved: ["${network}.04.2 - ${network}.04.3"]
     static: ["${network}.04.100 - ${network}.04.105"]
     cloud_properties:
-      subnet: ${cf-subnet1}
+      subnet: ${cf-subnet2}
       security_groups:
         - ${cf-sg}
 
@@ -59,6 +59,36 @@ update:
   update_watch_time: 5000-600000
 
 jobs:
+- name: messaging-z1 # "backbone"
+  instances: 1
+  resource_pool: small_z1
+  templates:
+  - { name: consul_agent, release: cf }
+  - { name: etcd, release: cf }
+  - { name: etcd_metrics_server, release: cf }
+  - { name: nats, release: cf }
+  - { name: nats_stream_forwarder, release: cf }
+  - { name: doppler, release: cf }
+  - { name: syslog_drain_binder, release: cf }
+  - { name: metron_agent, release: cf }
+  persistent_disk: 1024
+  networks:
+    - { name: cf_private, static_ips: [${network}.04.103]}
+  properties:
+    etcd_metrics_server:
+      nats:
+        machines: [${network}.04.103]
+        password: nats
+        username: nats
+
+    consul:
+      agent:
+        mode: server
+
+    doppler: {zone: z1}
+    doppler_endpoint:
+      shared_secret: ${cf-pass}
+
 - name: database-z1
   instances: 1
   resource_pool: small_z1
@@ -87,36 +117,6 @@ jobs:
           component: blobstore
         uris:
         - "blobstore.${cf-domain}"
-
-- name: messaging-z1 # "backbone"
-  instances: 1
-  resource_pool: small_z1
-  templates:
-  - { name: consul_agent, release: cf }
-  - { name: etcd, release: cf }
-  - { name: etcd_metrics_server, release: cf }
-  - { name: nats, release: cf }
-  - { name: nats_stream_forwarder, release: cf }
-  - { name: doppler, release: cf }
-  - { name: syslog_drain_binder, release: cf }
-  - { name: metron_agent, release: cf }
-  persistent_disk: 1024
-  networks:
-    - { name: cf_private, static_ips: [${network}.04.103]}
-  properties:
-    etcd_metrics_server:
-      nats:
-        machines: [${network}.04.103]
-        password: ${cf-nats-pass}
-        username: nats
-
-    consul:
-      agent:
-        mode: server
-
-    doppler: {zone: z1}
-    doppler_endpoint:
-      shared_secret: ${cf-pass}
 
 - name: haproxy-z1
   instances: 1
@@ -153,7 +153,7 @@ jobs:
     - { name: cf_private, static_ips: [${network}.04.104]}
   properties:
     dropsonde: {enabled: true}
-    
+
     login:
       catalina_opts: -Xmx768m -XX:MaxPermSize=256m
 
