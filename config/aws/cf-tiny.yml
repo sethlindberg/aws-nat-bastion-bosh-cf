@@ -27,7 +27,9 @@ networks:
     dns: [${network}.0.2]
     reserved: ["${network}.0.2 - ${network}.0.10"]
     cloud_properties:
-      subnet: ${bosh-subnet}
+      subnet: ${bosh-subnet} ### Bastion-sg not bosh
+      security_groups:
+        - ${cf-sg}
 
 - name: elastic
   type: vip
@@ -210,7 +212,7 @@ jobs:
   - {name: metron_agent, release: cf}
   - {name: route_registrar, release: cf}
   networks:
-    - { name: cf_private } # , static_ips: [${network}.04.103]}
+    - { name: cf_private , static_ips: [${network}.04.105]}
   properties:
     consul:
       agent:
@@ -336,7 +338,7 @@ properties:
       log_level: null
       servers:
         lan:
-        - ${network}.04.105
+        - ${network}.04.103
     encrypt_keys:
     - ${cf-pass}
     require_ssl: false
@@ -361,7 +363,7 @@ properties:
   description: Cloud Foundry sponsored by Pivotal
   domain: ${cf-domain}
   etcd:
-    machines: [${network}.04.104]
+    machines: [${network}.04.103]
     peer_require_ssl: false
     require_ssl: false
   hm9000:
@@ -371,7 +373,7 @@ properties:
     port: 4443
   loggregator:
     etcd:
-      machines: [${network}.04.104]
+      machines: [${network}.04.103]
   loggregator_endpoint:
     shared_secret: ${cf-pass}
   metron_agent:
