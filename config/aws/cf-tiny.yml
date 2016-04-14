@@ -383,7 +383,7 @@ properties:
     shared_secret: ${cf-pass}
   nats:
     machines: [${network}.04.103]
-    password: ${cf-pass}
+    password: nats
     port: 4222
     user: nats
   ssl:
