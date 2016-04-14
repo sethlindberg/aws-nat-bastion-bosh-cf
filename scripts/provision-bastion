@@ -301,7 +301,7 @@ provision_cf_release() {
   {
     bosh upload release --skip-if-exists "https://bosh.io/d/github.com/cloudfoundry/cf-release?v=${cfReleaseVersion}"
 	
-	bosh upload stemcell "https://bosh.io/d/stemcells/bosh-aws-xen-hvm-ubuntu-trusty-go_agent?v=${cfBOSHUbuntuStemCell}"
+	bosh upload stemcell --skip-if-exists "https://bosh.io/d/stemcells/bosh-aws-xen-hvm-ubuntu-trusty-go_agent?v=${cfBOSHUbuntuStemCell}"
 	
     bosh deployment "${HOME}/workspace/deployments/cf-${cfSize}.yml"
     for attempt in {0..2}
