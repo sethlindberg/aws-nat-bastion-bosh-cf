@@ -137,7 +137,7 @@ jobs:
         ${cf-haproxy-ssl-pem}
     router:
       servers:
-        z1: [${network}.04.102]
+        z1: [${network}.04.104]
 
 - name: api-z1
   instances: 1
