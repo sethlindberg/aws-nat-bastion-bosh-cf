@@ -216,6 +216,12 @@ provision_cf() {
     cp "${HOME}/deployments/cf-${cfSize}.yml" "${HOME}/workspace/deployments/cf-${cfSize}.yml"
     # TODO: Replace this with spruce!!!
 
+    if [[ "${cfDomain}" == "XIP" ]]
+    then
+      cfDomain="${cfIP}.xip.io"
+      export SKIP_SSL_VALIDATION="true"
+    fi
+
     # If cfRunSubdomain is set, then use it's value to replace the default subdomain. Otherwise (if empty), don't use a subdomain
     if [[ -n "${cfRunSubdomain}" ]]
     then cfRunSubdomainRE="s/run.\${cf-domain}/${cfRunSubdomain}.${cfDomain}/g"
