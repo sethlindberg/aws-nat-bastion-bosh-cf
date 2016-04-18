@@ -27,7 +27,7 @@ networks:
     dns: [${network}.0.2]
     reserved: ["${network}.0.2 - ${network}.0.10"]
     cloud_properties:
-      subnet: ${bosh-subnet} ### Bastion-sg not bosh
+      subnet: ${aws_subnet_bastion} ### Bastion-sg not bosh
       security_groups:
         - ${cf-sg}
 
@@ -42,7 +42,7 @@ resource_pools:
     name: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
     version: ${bosh-stemcell-version}
   cloud_properties:
-    availability_zone: ${cf-subnet1-az}
+    availability_zone: ${cf-subnet2-az}
     instance_type: m3.medium
 
 compilation:
@@ -50,7 +50,7 @@ compilation:
   network: cf_private
   reuse_compilation_vms: true
   cloud_properties:
-    availability_zone: ${cf-subnet1-az}
+    availability_zone: ${cf-subnet2-az}
     instance_type: m3.medium
 
 update:
@@ -144,7 +144,6 @@ jobs:
   resource_pool: small_z1
   templates:
   - { name: consul_agent, release: cf }
-  - { name: routing-api, release: cf }
   - { name: gorouter, release: cf }
   - { name: cloud_controller_ng, release: cf }
   - { name: cloud_controller_worker, release: cf}
@@ -201,6 +200,7 @@ jobs:
       agent:
         services:
           cloud_controller_ng: {}
+		  uaa: {}
 
 - name: health-z1
   instances: 1
@@ -336,6 +336,7 @@ properties:
   consul:
     agent:
       log_level: null
+      domain: cf.internal
       servers:
         lan:
         - ${network}.04.103
