@@ -61,7 +61,7 @@ variable "cf" {
     domain = "XIP"
     run_subdomain = "run"
     apps_subdomain = "apps"
-    release_version = "231"
+    release_version = "235"
     etcd_version = "35"
     haproxy_version = "6"
     haproxy_ssl_pem = ""
