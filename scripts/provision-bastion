@@ -338,6 +338,10 @@ provision_bosh() {
   provision_bosh_director
 }
 
+destroy_bosh() {
+  "${HOME}/bin/bosh-init delete ${HOME}/deployments/bosh.yml"
+}
+
 main() {
 
   {
@@ -370,6 +374,7 @@ main() {
     (base)          provision_base ;;
     (bosh)          provision_bosh ;;
     (cf)            provision_cf   ;;
+    (destroy)       destroy_bosh   ;;
     (all)
       provision_base
       provision_bosh
