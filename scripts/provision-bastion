@@ -339,6 +339,8 @@ provision_bosh() {
 }
 
 destroy_bosh() {
+  # Delete the two deployments
+  bosh -n delete deployment cf
   "${HOME}/bin/bosh-init delete ${HOME}/deployments/bosh.yml"
 }
 
