@@ -226,7 +226,7 @@ prepare_cf_tiny_yaml_manifest() {
   replace "${_tmp}" "\${cf-release-version}" "$(tf_var "cf_release_version")"
   replace "${_tmp}" "\${cf-etcd-version}" "$(tf_var "cf_etcd_version")"
   replace "${_tmp}" "\${cf-haproxy-version}" "$(tf_var "cf_haproxy_version")"
-  replace "${_tmp}" "\${cf-domain}" "$(tf_var "cf_domain")"
+#  replace "${_tmp}" "\${cf-domain}" "$(tf_var "cf_domain")"  # Handled in provision instead
   replace "${_tmp}" "\${cf-admin-pass}" "$(tf_var "cf_admin_pass")"
   replace "${_tmp}" "\${cf-subnet1}" "$(tf_var "cf_subnet1")"
   replace "${_tmp}" "\${cf-subnet2}" "$(tf_var "cf_subnet2")"
@@ -238,6 +238,7 @@ prepare_cf_tiny_yaml_manifest() {
   replace "${_tmp}" "\${cf-network}" "$(tf_var "network")"
   replace "${_tmp}" "\${cf-pass}" "$(tf_var "cf_pass")"
   replace "${_tmp}" "\${cf-size}" "$(tf_var "cf_size")"
+  replace "${_tmp}" "\${bastion-subnet}" "$(tf_var "aws_subnet_bastion")"
 }
 
 scp_file() {

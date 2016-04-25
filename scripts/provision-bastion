@@ -340,8 +340,21 @@ provision_bosh() {
 
 destroy_bosh() {
   # Delete the two deployments
-  bosh -n delete deployment cf
-  "${HOME}/bin/bosh-init delete ${HOME}/deployments/bosh.yml"
+  {
+    bosh -n delete deployment cf
+    "${HOME}/bin/bosh-init delete ${HOME}/deployments/bosh.yml"
+  } &>>"${HOME}/provision.log"
+}
+
+install_cf_cli () {
+  echo "[provision] Installing Cloud Foundry CLI..."
+  {
+    if [[ ! -x "${HOME}/bin/cf" ]]
+	then
+      curl -L "https://cli.run.pivotal.io/stable?release=linux64-binary&source=github" | tar -zx
+      mv cf bin
+    fi
+  } &>>"${HOME}/provision.log"
 }
 
 main() {
@@ -377,9 +390,11 @@ main() {
     (bosh)          provision_bosh ;;
     (cf)            provision_cf   ;;
     (destroy)       destroy_bosh   ;;
+    (cf_cli)        install_cf_cli ;;
     (all)
       provision_base
       provision_bosh
+      install_cf_cli
       provision_cf
       ;;
     (*)
@@ -421,7 +436,7 @@ cfRunSubdomain=""
 cfAppsSubdomain=""
 cfAdminPass=""
 cfPass=""
-cfBOSHUbuntuStemCell="3012"
+cfBOSHUbuntuStemCell="3215.4"
 
 backboneCountZ1=""
 apiCountZ1=""
