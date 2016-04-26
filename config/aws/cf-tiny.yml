@@ -277,41 +277,85 @@ jobs:
         services:
           dea: {}
 
+- name: acceptance_tests
+  instances: 1
+  lifecycle: errand
+  networks:
+  - name: cf_private
+  properties:
+    networks:
+      apps:
+  resource_pool: small_z1
+  templates: cf_private
+  - { name: acceptance-tests, release: cf }
+
+- name: smoke_tests
+  instances: 1
+  lifecycle: errand
+  networks:
+  - name: cf_private
+  properties:
+    networks:
+      apps: cf_private
+  resource_pool: small_z1
+  templates:
+  - { name: smoke-tests, release: cf }
+
 properties:
   networks: {apps: cf_private}
   app_domains: [${cf-domain}]
+  acceptance_tests:
+    admin_password: ${cf-pass}
+    admin_user: admin
+    api: api.${cf-domain}
+    apps_domain: ${cf-domain}
+    client_secret: ${cf-pass}
+    include_routing: true
+    nodes: 4
+    skip_ssl_validation: true
+    system_domain: system.${cf-domain}
+    use_http: true
+  smoke_tests:
+    api: https://api.${cf-domain}
+    apps_domain: ${cf-domain}
+    ginkgo_opts: null
+    org: SMOKE_TEST_ORG
+    password: ${cf-pass}
+    skip_ssl_validation: true
+    space: SMOKE_TEST_SPACE
+    user: admin
   cc:
     allow_app_ssh_access: false
     buildpacks:
       blobstore_type: webdav
       webdav_config:
         password: ${cf-pass}
-        private_endpoint: http://blobstore.service.cf.internal
-        public_endpoint: http://blobstore.${cf-domain}
+        private_endpoint: https://blobstore.service.cf.internal
+        public_endpoint: https://blobstore.${cf-domain}
         secret: ${cf-pass}
         username: blobstore-username
     droplets:
       blobstore_type: webdav
       webdav_config:
         password: ${cf-pass}
-        private_endpoint: http://blobstore.service.cf.internal
-        public_endpoint: http://blobstore.${cf-domain}
+        private_endpoint: https://blobstore.service.cf.internal
+        public_endpoint: https://blobstore.${cf-domain}
         secret: ${cf-pass}
         username: blobstore-username
     packages:
       blobstore_type: webdav
       webdav_config:
         password: ${cf-pass}
-        private_endpoint: http://blobstore.service.cf.internal
-        public_endpoint: http://blobstore.${cf-domain}
+        private_endpoint: https://blobstore.service.cf.internal
+        public_endpoint: https://blobstore.${cf-domain}
         secret: ${cf-pass}
         username: blobstore-username
     resource_pool:
       blobstore_type: webdav
       webdav_config:
         password: ${cf-pass}
-        private_endpoint: http://blobstore.service.cf.internal
-        public_endpoint: http://blobstore.${cf-domain}
+        private_endpoint: https://blobstore.service.cf.internal
+        public_endpoint: https://blobstore.${cf-domain}
         secret: ${cf-pass}
         username: blobstore-username
     bulk_api_password: ${cf-pass}

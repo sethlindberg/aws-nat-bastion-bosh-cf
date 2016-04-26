@@ -59,7 +59,7 @@ provision_os_packages() {
           zlib zlib-devel libevent libevent-devel readline readline-devel cmake ntp \
           htop wget tmux screen gcc g++ autoconf pcre pcre-devel vim-enhanced gcc mysql-devel \
           postgresql-devel postgresql-libs sqlite-devel libxslt-devel libxml2-devel \
-          yajl-ruby cmake gpg patch gcc-c++
+          yajl-ruby cmake gpg patch gcc-c++ bind-utils
         ;;
     esac
   } &>>"${HOME}/provision.log"
