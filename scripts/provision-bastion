@@ -338,6 +338,14 @@ provision_bosh() {
   provision_bosh_director
 }
 
+destroy_bosh() {
+  # Delete the two deployments
+  {
+    bosh -n delete deployment cf
+    "${HOME}/bin/bosh-init delete ${HOME}/deployments/bosh.yml"
+  } &>>"${HOME}/provision.log"
+}
+
 install_cf_cli () {
   echo "[provision] Installing Cloud Foundry CLI..."
   {
@@ -381,6 +389,7 @@ main() {
     (base)          provision_base ;;
     (bosh)          provision_bosh ;;
     (cf)            provision_cf   ;;
+    (destroy)       destroy_bosh   ;;
     (cf_cli)        install_cf_cli ;;
     (all)
       provision_base
