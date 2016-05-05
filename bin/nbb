@@ -31,7 +31,7 @@ tf_var() {
 }
 
 check_install_terraform()  {
-  local _version=0.6.14 _install=false
+  local _version=0.6.15 _install=false
 
   log "Checking for terraform CLI ${_version} ..."
   if ! command -v terraform &>/dev/null
@@ -70,12 +70,16 @@ provision_vpc() {
       terraform apply -var-file terraform.tfvars
       ;;
     (destroy)
-      # Run bosh director, delete cf and bosh
-      _bastionIP="$(tf_var bastion_ip)"
-      _keyPath="$(sed -e "s#^~#${HOME}#" < <(tf_var aws_key_path))"
+      {
+        # Run bosh director, delete cf and bosh
+        _bastionIP="$(tf_var bastion_ip)"
+        _keyPath="$(sed -e "s#^~#${HOME}#" < <(tf_var aws_key_path))"
 
-      _cmd="DEBUG=true \${HOME}/provision destroy"
-      ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
+        _cmd="DEBUG=true \${HOME}/provision destroy"
+        ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
+      } || {
+        echo "Could not connect to destroy BOSH releases and Director"
+      }
       # Let terraform clean up
       terraform plan -destroy -var-file terraform.tfvars -out terraform.tfplan
       terraform apply terraform.tfplan
