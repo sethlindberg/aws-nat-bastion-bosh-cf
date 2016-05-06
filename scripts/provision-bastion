@@ -351,6 +351,7 @@ provision_rdpg_release() {
     done
   } &>>"${HOME}/provision.log"
 }
+
 provision_redis() {
     if [[ -f "${HOME}/.rvm/environments/default" ]]
     then source "${HOME}/.rvm/environments/default" &>/dev/null
