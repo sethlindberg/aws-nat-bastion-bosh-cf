@@ -351,6 +351,64 @@ provision_rdpg_release() {
     done
   } &>>"${HOME}/provision.log"
 }
+provision_redis() {
+    if [[ -f "${HOME}/.rvm/environments/default" ]]
+    then source "${HOME}/.rvm/environments/default" &>/dev/null
+    fi
+    echo "[provision] Bootstrapping Redis..."
+    {
+      cp "${HOME}/deployments/redis-manifest.yml" "${HOME}/workspace/deployments/redi-manifest.yml"
+      # TODO: Replace this with spruce!!!
+
+      if [[ "${cfDomain}" == "SSLIP" ]]
+      then
+        cfDomain="${cfIP}.sslip.io"
+        export SKIP_SSL_VALIDATION="true"
+      fi
+      if [[ "${cfDomain}" == "XIP" ]]
+      then
+        cfDomain="${cfIP}.xip.io"
+        export SKIP_SSL_VALIDATION="true"
+      fi
+
+      # If cfRunSubdomain is set, then use it's value to replace the default subdomain. Otherwise (if empty), don't use a subdomain
+      if [[ -n "${cfRunSubdomain}" ]]
+      then cfRunSubdomainRE="s/run.\${cf-domain}/${cfRunSubdomain}.${cfDomain}/g"
+      else cfRunSubdomainRE="s/run.\${cf-domain}/${cfDomain}/g"
+      fi
+
+      # If cfAppsSubdomain is set, then use it's value to replace the default subdomain. Otherwise (if empty), don't use a subdomain
+      if [[ -n "${cfAppsSubdomain}" ]]
+      then cfAppsSubdomainRE="s/apps.\${cf-domain}/${cfAppsSubdomain}.${cfDomain}/g"
+      else cfAppsSubdomainRE="s/apps.\${cf-domain}/${cfDomain}/g"
+      fi
+
+      boshDirectorUUID="$(bosh status --uuid)"
+
+      echo "We found bosh UUID ${boshDirectorUUID}"
+
+      /bin/sed -i \
+        -e "s/\${network}/${network}/g" \
+        -e "s/\${cf-subnet1-az}/${cfSubnet1AZ}/g" \
+        -e "s/\${cf-subnet2-az}/${cfSubnet2AZ}/g" \
+        -e "s/\${cf-eip}/${cfIP}/g" \
+        -e "s/\${services-subnet1}/${servicesSubnet1}/g" \
+        -e "s/\${services-sg}/${servicesSecurityGroup}/g" \
+        -e "s/\${bosh-director-uuid}/${boshDirectorUUID}/g" \
+        -e "s/\${bosh-subnet}/${boshSubnet}/g" \
+        -e "${cfRunSubdomainRE}" \
+        -e "${cfAppsSubdomainRE}" \
+        -e "s/\${cf-domain}/${cfDomain}/g" \
+        -e "s/\${cf-admin-pass}/${cfAdminPass}/g" \
+        -e "s/\${cf-pass}/${cfPass}/g" \
+        -e "s/\${bosh-stemcell-version}/${cfBOSHUbuntuStemCell}/g" \
+        "${HOME}/workspace/deployments/redis.yml"
+
+      echo "Updated ${HOME}/workspace/deployments/redis-manifest.yml"
+  }
+
+	provision_redis_release
+}
 
 provision_redis_release() {
   # Upload the bosh release, set the deployment, and execute
@@ -488,7 +546,7 @@ cfRunSubdomain=""
 cfAppsSubdomain=""
 cfAdminPass=""
 cfPass=""
-cfBOSHUbuntuStemCell="3215.4"
+cfBOSHUbuntuStemCell="3232.2"
 
 backboneCountZ1=""
 apiCountZ1=""

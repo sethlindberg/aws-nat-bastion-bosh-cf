@@ -39,7 +39,7 @@ variable "centos_stemcell_version" {
 }
 
 variable "ubuntu_stemcell_version" {
-  default = "3232.1"
+  default = "3232.2"
 }
 
 # SHA1 can be found with curl stemcell-sha1s.starkandwayne.com/<stemcell>/<version>
@@ -48,9 +48,9 @@ variable "centos_stemcell_sha1" {
   default = "226d52ab60dbd62f132795213e32ac67b4a8727e"
 }
 
-#variable "ubuntu_stemcell_sha1" {
-#  default = "8ae20d8032993f48d3ebf983ba5d94de87283634"
-#}
+variable "ubuntu_stemcell_sha1" {
+  default = "c24ca1e494990aefa2eb236795447b76a9056648"
+}
 
 variable "network" {
 	default = "10.10"

@@ -91,7 +91,7 @@ jobs:
       nats:
         machines: [${network}.04.103]
         password: nats
-        username: nats
+        username: natspass
 
     consul:
       agent:
@@ -828,7 +828,7 @@ properties:
     shared_secret: ${cf-pass}
   nats:
     machines: [${network}.04.103]
-    password: nats
+    password: natspass
     port: 4222
     user: nats
   ssl:
