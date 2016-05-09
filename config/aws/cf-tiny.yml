@@ -373,9 +373,9 @@ jobs:
   - name: cf_private
   properties:
     networks:
-      apps:
+      apps: cf_private
   resource_pool: small_z1
-  templates: cf_private
+  templates:
   - { name: acceptance-tests, release: cf }
 
 - name: smoke_tests
