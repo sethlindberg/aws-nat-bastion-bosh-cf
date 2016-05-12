@@ -335,6 +335,8 @@ provision_rdpg_release() {
   # Upload the bosh release, set the deployment, and execute
   echo "[provision] RDPG Release..."
   {
+    bosh upload stemcell "https://bosh.io/d/stemcells/bosh-aws-xen-hvm-centos-7-go_agent?v=${cfBOSHCentOSStemCell}"
+
     bosh upload release --skip-if-exists "https://rdpg-bosh.s3.amazonaws.com/rdpg-0.2.62.tgz"
     bosh upload release --skip-if-exists "https://github.com/hybris/nxlog-boshrelease/releases/download/v0.3.0/nxlog-0.3.0.tgz"
     bosh upload release --skip-if-exists "https://github.com/cloudfoundry-community/metrics-boshrelease/releases/download/v1/metrics-1.tgz"
@@ -428,6 +430,8 @@ provision_redis_release() {
   } &>>"${HOME}/provision.log"
 }
 
+# bosh upload release https://bosh.io/d/github.com/cf-platform-eng/docker-boshrelease
+# bosh upload release https://bosh.io/d/github.com/cloudfoundry-community/postgresql-docker-boshrelease
 
 provision_base() {
   provision_path
@@ -548,6 +552,7 @@ cfAppsSubdomain=""
 cfAdminPass=""
 cfPass=""
 cfBOSHUbuntuStemCell="3232.2"
+cfBOSHCentOSStemCell="3232.1"
 
 backboneCountZ1=""
 apiCountZ1=""
