@@ -89,7 +89,7 @@ jobs:
   properties:
     etcd_metrics_server:
       nats:
-        machines: [${network}.04.103]
+        machines: ["${network}.04.103"]
         password: nats
         username: natspass
 
