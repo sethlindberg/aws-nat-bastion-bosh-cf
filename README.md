@@ -109,6 +109,8 @@ Connecting to the Bastion host to control the BOSH Director run BOSH cli or Clou
 make ssh
 ```
 
+When running longer running tasks like `make provision-cf` or `make provision-bosh` it can be useful to see progress by running `tail -f /home/centos/provision.log` on the bastion server.  
+
 ### Destroy Environment
 
 To tear down the BOSH Director, Bastion server , NAT server and remove the Amazon Virtual Private Cloud definitions defined by Terraform you can run `make destroy`.
