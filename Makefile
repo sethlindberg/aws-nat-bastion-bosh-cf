@@ -34,6 +34,9 @@ provision-bosh:
 provision-cf:
 	./bin/nbb provision cf
 
+provision-cf-cli:
+	./bin/nbb provision cf_cli
+
 ssh:
 	./bin/nbb bastion ssh
 
