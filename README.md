@@ -83,26 +83,48 @@ Using `bosh-init` we'll be creating the BOSH Director instance next.
 ```sh
 make provision-bosh
 ```
+### Install CF CLI
 
-### Additional Commands
+Installing the Cloud Foundry CLI tool on the Bastion Host can be performed by running this command.
 
-For tear-down of the AWS VPC, you may run:
+```sh
+make provision-cf-cli
+```
+
+### Deploy Cloud Foundry
+
+Once the base bastion server and BOSH Director are setup Cloud Foundry can be deployed.
+
+```sh
+make provision-cf
+```
+
+## Additional Commands
+
+### Connect to Bastion Server
+
+Connecting to the Bastion host to control the BOSH Director run BOSH cli or Cloud Foundry cli commands run:
+
+```sh
+make ssh
+```
+
+### Destroy Environment
+
+To tear down the BOSH Director, Bastion server , NAT server and remove the Amazon Virtual Private Cloud definitions defined by Terraform you can run `make destroy`.
 
 ```sh
 make destroy
 ```
+
+### Clean Terraform Cache
 
 To reset the Terraform cached files and start over, you can also run:
 
 ```sh
 make clean
 ```
-
 Check out [terraform debugging](docs/terraform.md#debugging) for more about troubleshooting Terraform errors.
-
-## Next Steps
-
-The next steps will be to establish an SSH connection to the BOSH Director, add releases and perform deploys.
 
 ## Related Repositories
 
