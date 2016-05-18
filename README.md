@@ -99,6 +99,20 @@ Once the base bastion server and BOSH Director are setup Cloud Foundry can be de
 make provision-cf
 ```
 
+### Make All
+
+Running `make all`, which will run these commands in order:
+
+```
+  make plan
+  make apply
+  make provision-all
+    make provision-base
+    make provision-bosh
+    make provision-cf-cli
+    make provision-cf
+```
+
 ## Additional Commands
 
 ### Connect to Bastion Server
