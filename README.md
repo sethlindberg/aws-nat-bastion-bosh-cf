@@ -101,16 +101,15 @@ make provision-cf
 
 ### Make All
 
-Running `make all`, which will run these commands in order:
+Running `make all`, will run the above commands in order:
 
 ```
   make plan
   make apply
-  make provision-all
-    make provision-base
-    make provision-bosh
-    make provision-cf-cli
-    make provision-cf
+  make provision-base
+  make provision-bosh
+  make provision-cf-cli
+  make provision-cf
 ```
 
 ## Additional Commands
