@@ -71,15 +71,21 @@ provision_vpc() {
       ;;
     (destroy)
       {
-        # Run bosh director, delete cf and bosh
         _bastionIP="$(tf_var bastion_ip)"
-        _keyPath="$(sed -e "s#^~#${HOME}#" < <(tf_var aws_key_path))"
+		if [[ ! -z "${_bastionIP:-}" ]]
+        then
+          # Run bosh director, delete cf and bosh
+	      _keyPath="$(sed -e "s#^~#${HOME}#" < <(tf_var aws_key_path))"
 
-        _cmd="DEBUG=true \${HOME}/provision destroy"
-        ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
+	      _cmd="DEBUG=true \${HOME}/provision destroy"
+	      echo "Running 'provision destroy' on Bastion host"
+	      echo "ssh -t -i ${_keyPath} centos@${_bastionIP} ${_cmd}"
+	      ssh -t -i "${_keyPath}" centos@"${_bastionIP}" "${_cmd}"
+	    fi
       } || {
-        echo "Could not connect to destroy BOSH releases and Director"
-      }
+	    echo "Could not connect to destroy BOSH releases and Director"
+	  }
+
       # Let terraform clean up
       terraform plan -destroy -var-file terraform.tfvars -out terraform.tfplan
       terraform apply terraform.tfplan
@@ -235,7 +241,7 @@ prepare_cf_tiny_yaml_manifest() {
   replace "${_tmp}" "\${cf-subnet1}" "$(tf_var "cf_subnet1")"
   replace "${_tmp}" "\${cf-subnet2}" "$(tf_var "cf_subnet2")"
   replace "${_tmp}" "\${lb-subnet1}" "$(tf_var "bosh_subnet")"
-  replace "${_tmp}" "\${cf-subnet1-az}" "$(tf_var "aws_subnet_bastion_az")"
+  replace "${_tmp}" "\${bastion-az}" "$(tf_var "aws_subnet_bastion_az")"
   replace "${_tmp}" "\${cf-private-domains}" "$(tf_var "cf_private_domains")"
   replace "${_tmp}" "\${cf-ip}" "$(tf_var "cf_api_ip")"
   replace "${_tmp}" "\${cf-sg}" "$(tf_var "cf_sg")"
