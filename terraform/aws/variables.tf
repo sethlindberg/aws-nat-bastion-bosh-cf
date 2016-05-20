@@ -84,6 +84,10 @@ variable "cf" {
   }
 }
 
+# If you get an receive an error like
+# "* aws_subnet.lb: Error creating subnet: InvalidParameterValue: Value (us-east-1a) for parameter availabilityZone is invalid.
+#    Subnets can currently only be created in the following availability zones: us-east-1c, us-east-1d, us-east-1b, us-east-1e."
+# You may need to change one of the blocks below
 
 variable "cf1_az" {
   type = "map"
@@ -103,7 +107,7 @@ variable "cf1_az" {
 variable "cf2_az" {
   type = "map"
   default = {
-    us-east-1 = "us-east-1e"
+    us-east-1 = "us-east-1b"
     us-west-1 = "us-west-1b"
     us-west-2 = "us-west-2b"
     ap-northeast-1 = "ap-northeast-1b"

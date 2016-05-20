@@ -43,9 +43,9 @@ resource_pools:
     version: ${bosh-stemcell-version}
   cloud_properties:
     availability_zone: ${cf-subnet2-az}
-    instance_type: m3.medium
+    instance_type: t2.small
     ephemeral_disk: {size: 8_000, type: gp2}
-- name: burst_z1
+- name: medium_z1
   network: cf_private
   stemcell:
     name: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
@@ -53,7 +53,22 @@ resource_pools:
   cloud_properties:
     availability_zone: ${cf-subnet2-az}
     instance_type: t2.medium
-    ephemeral_disk: {size: 8_000, type: gp2}
+- name: large_z1
+  network: cf_private
+  stemcell:
+    name: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
+    version: ${bosh-stemcell-version}
+  cloud_properties:
+    availability_zone: ${cf-subnet2-az}
+    instance_type: t2.large
+- name: lb_z1
+  network: cf_public
+  stemcell:
+    name: bosh-aws-xen-hvm-ubuntu-trusty-go_agent
+    version: ${bosh-stemcell-version}
+  cloud_properties:
+    availability_zone: ${bastion-az}
+    instance_type: t2.small
 
 compilation:
   workers: 2
@@ -61,7 +76,7 @@ compilation:
   reuse_compilation_vms: true
   cloud_properties:
     availability_zone: ${cf-subnet2-az}
-    instance_type: m3.medium
+    instance_type: c3.xlarge
 
 update:
   canaries: 2
@@ -103,7 +118,7 @@ jobs:
 
 - name: database-z1
   instances: 1
-  resource_pool: small_z1
+  resource_pool: large_z1
   templates:
   - {name: consul_agent, release: cf }
   - {name: postgres, release:  cf }
@@ -132,7 +147,7 @@ jobs:
 
 - name: haproxy-z1
   instances: 1
-  resource_pool: small_z1
+  resource_pool: lb_z1
   templates:
   - { name: consul_agent, release: cf }
   - { name: haproxy, release: cf}
@@ -241,7 +256,7 @@ jobs:
 
 - name: api-z1
   instances: 1
-  resource_pool: small_z1
+  resource_pool: medium_z1
   templates:
   - { name: consul_agent, release: cf }
   - { name: gorouter, release: cf }
@@ -351,7 +366,7 @@ jobs:
 
 - name: runners-z1
   instances: 1
-  resource_pool: small_z1
+  resource_pool: large_z1
   templates:
   - { name: consul_agent, release: cf}
   - { name: dea_next, release: cf}
