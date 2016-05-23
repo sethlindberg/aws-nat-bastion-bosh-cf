@@ -62,6 +62,7 @@ compilation:
   cloud_properties:
     availability_zone: ${cf-subnet2-az}
     instance_type: m3.medium
+    root_disk: {size: 40_000, type: gp2}
 
 update:
   canaries: 2
@@ -501,7 +502,7 @@ properties:
     staging_upload_password: ${cf-pass}
     staging_upload_user: staging_upload_user
   ccdb:
-    address: ${network}.04.101
+    address: ${uuacc_db_address}
     databases:
     - {name: ccdb, tag: cc}
     db_scheme: postgres

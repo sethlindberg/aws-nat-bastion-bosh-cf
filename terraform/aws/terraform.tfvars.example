@@ -5,3 +5,4 @@ aws_key_name = "bosh"                       # equal to EC2 Key Pair name
 aws_region = "us-east-1"                    # ensure region is accurate
 network = "10.10"                           # private network per rfc1918
 bosh_type = "ruby"                          # or "none",  soon "golang"
+rdb_password = "choose_a_secure_password"   # modify this, never go with default passwords
