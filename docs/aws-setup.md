@@ -9,7 +9,8 @@ Before you begin please ensure you have created an account or have logged in to 
 We're creating the [IAM User](http://docs.aws.amazon.com/IAM/latest/UserGuide/id.html) that will have it's abilities defined by the membership to the Group and Role you create.
 
 * Create your user.  For example: `tbird`. This will likely match what is used as the SSH Key below.
-* Add that user to a Group.  Give that user permissions on the system by attaching a policy.
+* Create a new group.  Give the group PowerUserAccess.
+* Add your new user to the group you just created.
 
 NOTE: An interesting tool to discover more about IAM Polices is the [IAM Policy Simulator](http://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_testing-policies.html).
 
@@ -35,4 +36,4 @@ openssl pkcs8 -in path_to_private_key -inform PEM -outform DER -topk8 -nocrypt |
 
 Then sign into AWS. At the top of the page click on Services, then EC2.  Look on the left hand side, under NETWORK & SECURITY and click on Key Pairs.  The fingerprint in the AWS Console for your user should match the output from the command above.
 
-NOTE: Be aware that AWS EC2 keys are region based, and require 2048 bit encryption.
+NOTE: Be aware that AWS EC2 keys are region based, and require 2048 bit RSA or larger.
