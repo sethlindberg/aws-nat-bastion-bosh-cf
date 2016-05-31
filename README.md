@@ -25,6 +25,7 @@ In your local code folder clone the repo, then change to that folder.
 
 ```sh
 git clone https://github.com/cloudfoundry-community/aws-nat-bastion-bosh-cf.git
+cd aws-nat-bastion-bosh-cf
 ```
 
 ### Prepare
