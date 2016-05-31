@@ -26,6 +26,8 @@ Otherwise it's in the IAM Dashboard for your User, located under the **Security 
 
 We use an SSH Key to perform authentication to AWS on your behalf.  You can either use an [existing key or generate a key for this purpose](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html).
 
+Copy the private ssh key into the <project directory>/sshkeys directory with the name `bosh.pem`.
+
 ## Verify the Key
 
 You can verify your key is installed correctly by running this command to get the output of your local file's fingerprint.

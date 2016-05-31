@@ -12,13 +12,6 @@ How does it work? [Terraform](https://www.terraform.io/) configures the networki
 
 ## Prerequisites
 
-Examples use a Mac OS X operating system.  Ensure the following are setup before continuing.
-
-  * [Amazon Web Services Setup](docs/aws-setup.md)
-  * Mac OS X with [Homebrew](http://brew.sh/)
-
-## Installation
-
 ### Clone Repo
 
 In your local code folder clone the repo, then change to that folder.
@@ -27,6 +20,18 @@ In your local code folder clone the repo, then change to that folder.
 git clone https://github.com/cloudfoundry-community/aws-nat-bastion-bosh-cf.git
 cd aws-nat-bastion-bosh-cf
 ```
+
+### External Dependencies
+
+Examples use a Mac OS X operating system.  Ensure the following are setup before continuing.
+
+  * [Amazon Web Services Setup](docs/aws-setup.md)
+  * Mac OS X with [Homebrew](http://brew.sh/)
+
+Homebrew will be used to install other third party software such as terraform or make
+
+
+## Installation
 
 ### Prepare
 
@@ -38,7 +43,7 @@ make prepare
 
 ### SSH Key
 
-Both BOSH and Cloud Foundry expect to find the key named `sshkeys/bosh.pem`.  Rename your public key to match this and copy it to the `sshkeys` folder.
+Both BOSH and Cloud Foundry expect to find the key named `sshkeys/bosh.pem`.  Rename your private key to match this and copy it to the `sshkeys` folder.
 
 ### Configure Terraform
 
@@ -46,7 +51,8 @@ Terraform creates a `plan`.  Then users `apply` the `plan` and the infrastructur
 
 Configure the `terraform/aws/terraform.tfvars` file and Terraform will know who you are on AWS and where to create it's resources.
 
-Copy the example file to the `terraform.tfvars` file:
+TODO Find location somewhere to state the region names us-west-1 since the EC2 displays (North California)
+Cpy the example file to the `terraform.tfvars` file:
 
 ```sh
 cp terraform/aws/terraform.tfvars.example terraform/aws/terraform.tfvars
