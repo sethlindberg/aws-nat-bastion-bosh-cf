@@ -201,7 +201,7 @@ install_spiff() {
 install_spruce() {
   echo "[provision] Installing Spruce to ${HOME}/bin/spruce"
   {
-    local _version="1.0.3"
+    local _version="1.4.0"
     local _url="https://github.com/geofffranks/spruce/releases/download/v${_version}/spruce-linux-amd64"
 
     if [[ ! -x "${HOME}/bin/spruce" ]]
