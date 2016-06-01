@@ -265,6 +265,7 @@ jobs:
   - { name: uaa, release: cf}
   - { name: metron_agent, release: cf }
   - { name: route_registrar, release: cf }
+  - { name: java-buildpack, release: cf}
   - { name: go-buildpack, release: cf}
   - { name: binary-buildpack, release: cf}
   - { name: nodejs-buildpack, release: cf}
@@ -1019,4 +1020,3 @@ properties:
     ssl:
       port: -1
     url: https://uaa.${cf-domain}
-
