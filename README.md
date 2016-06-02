@@ -75,9 +75,11 @@ When an apply is complete the output will look something like this:
 Apply complete! Resources: 27 added, 0 changed, 0 destroyed.
 ```
 
-### Provision Bastion Host
+### Install Requirements Onto Bastion Host
 
 A bastion host is a server that sits on a public Internet address and provides a special service.  This server is a jump-box that bridges the connection between public and private subnets.
+
+`make apply` created a bastion host. Now we need to install some additional tools on the bastion.
 
 ```sh
 make provision-base
