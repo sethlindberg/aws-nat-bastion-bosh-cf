@@ -148,6 +148,7 @@ To reset the Terraform cached files and start over, you can also run:
 ```sh
 make clean
 ```
+
 Check out [terraform debugging](docs/terraform.md#debugging) for more about troubleshooting Terraform errors.
 
 ## Related Repositories
@@ -157,3 +158,7 @@ Check out [terraform debugging](docs/terraform.md#debugging) for more about trou
   * [terraform-aws-cf-install](https://github.com/cloudfoundry-community/terraform-aws-cf-install)
   * [terraform-aws-vpc](https://github.com/cloudfoundry-community/terraform-aws-vpc)
   * [terraform-aws-cf-net](https://github.com/cloudfoundry-community/terraform-aws-cf-net)
+
+## Apps to Validate Your Deployment / Pipeline(s)
+
+Check out [docs/apps.md](docs/apps.md) for some suggested applications you can use to validate your deployment and keeping your diagnostic scope narrow so that a real production app with dozens of moving parts doesn't overcomplicate the process of validation. (These are also useful for potentially debugging integration(s) between "real" apps and integrations with services, etc.)
