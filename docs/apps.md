@@ -46,13 +46,13 @@ In general, a good application for *testing/validation purposes* consists of:
 
 ### Buildpacks for this project
 
-The available buildpacks can be seen by issuing `cf buildpacks` from your bastion host after full setup is complete, and/or by reviewing source code in, for example, [cf-tiny.yml](config/aws/cf-tiny.yml) (`grep` for "buildpack" and you'll see the list there). As of this writing, we have the following buildpacks available:
+The available buildpacks can be seen by issuing `cf buildpacks` from your bastion host after full setup is complete, and/or by reviewing source code in, for example, [cf-tiny.yml](../config/aws/cf-tiny.yml) (`grep` for "buildpack" and you'll see the list there). As of this writing, we have the following buildpacks available:
 
 + [PHP](http://php.net)
 + [Ruby](http://ruby-lang.org)
 + [Go](http://golang.org)
-+ [NodeJS](http://nodejs.org) (JavaScript)
++ [NodeJS](http://nodejs.org)
 + [Python](http://www.python.org)
 + [Java](https://www.oracle.com/java/)
 
-This list is indeed subject to change, and you are of course able to change it by altering the appropriate sections of your CF configuration YAML file. See [config/aws/cf-*.yml](config/aws) for examples.
+This list is indeed subject to change, and you are of course able to change it by altering the appropriate sections of your CF configuration YAML file. See [config/aws/cf-*.yml](../config/aws) for examples.
